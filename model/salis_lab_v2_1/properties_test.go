@@ -3,7 +3,7 @@ package salis_lab_v2_1
 import (
 	"testing"
 
-	"github.com/TimothyStiles/poly/rbs_calculator/model"
+	"github.com/allyourbasepair/rbscalculator/model"
 )
 
 // `cd` into this directory and run with

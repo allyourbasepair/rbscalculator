@@ -7,25 +7,22 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/TimothyStiles/poly/rbs_calculator/model"
-	rbs_model "github.com/TimothyStiles/poly/rbs_calculator/model/salis_lab_v2_1"
+	"github.com/allyourbasepair/rbscalculator/model"
+	rbs_model "github.com/allyourbasepair/rbscalculator/model/salis_lab_v2_1"
 	"github.com/olekukonko/tablewriter"
 )
 
 /*****************************************************
 June, 5, 2021
 The Ribosome Binding Site Calculator
-
 Translation is the process by which a messenger RNA (mRNA) is 'decoded' to a
 protein by a ribosome.
-
 When trying to synthesize proteins of our choice, we have to design a mRNA
 sequence with a  5' untranslated region, the protein coding sequence and a
 terminator sequence. The ribosome's interaction with the mRNA sequence
 determines the amount of the protein that will be synthesized. Thus, we need
 a model to understand these interactions and how they relate to the amount of
 protein produced.
-
 The ribosome binding site calculator returns a list of potential places (binding
 sites) a ribosome might bind to a mRNA. Each binding site breaks down a mRNA
 sequence into a 5' untranslated region and protein coding sequence, and includes
@@ -33,26 +30,21 @@ information about the predicted translation rate of that binding site. This is
 useful because it allows one to examine where a ribosome is likely to bind to
 the mRNA sequence by examining the relative differences between the translation
 initiation rates of each binding site.
-
 The other intended use of this calculator is to help one increase synthesis of
 a desired protein by the user re-desinging their mRNA sequence to increase
 translation initiation rate which should lead to an increase in the amount of
 the protein produced in-vitro.
-
 How the calculator works:
 To calculate the translation initiation rate of a binding site, we need a model
 of a ribosome's interactions with a mRNA strand and the relationship of the
 interactions with the translation initiation rate of the coding sequence of the
 mRNA strand.
-
 The current model of this RBS calculator is based upon the research done by
 The Salis Lab at The Penn State University. For more information on this model,
 please have a look at the `properties.go` file in the `salis_lab_v2_1`
 subpackage (./model/salis_lab_v2_1/properties.go).
-
 For information of how to develop a RBS Calculator of your own, please
 have a look at the `model.go` file in the `model` subpackage (./model/model.go).
-
 *****************************************************/
 
 // StartCodon specifies the start codon of the protein coding sequence of a

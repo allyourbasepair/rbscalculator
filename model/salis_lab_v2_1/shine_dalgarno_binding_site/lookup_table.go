@@ -6,7 +6,7 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/TimothyStiles/poly/rbs_calculator/csv_helper"
+	"github.com/allyourbasepair/rbscalculator/csv_helper"
 )
 
 //go:embed data/*

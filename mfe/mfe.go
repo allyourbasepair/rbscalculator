@@ -6,9 +6,9 @@ import (
 	"math"
 	"strings"
 
-	"github.com/TimothyStiles/poly/checks"
-	"github.com/TimothyStiles/poly/energy_params"
-	. "github.com/TimothyStiles/poly/secondary_structure"
+	"github.com/allyourbasepair/rbscalculator/checks"
+	"github.com/allyourbasepair/rbscalculator/energy_params"
+	. "github.com/allyourbasepair/rbscalculator/secondary_structure"
 )
 
 /******************************************************************************

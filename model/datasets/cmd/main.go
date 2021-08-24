@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/TimothyStiles/poly/rbs_calculator"
-	"github.com/TimothyStiles/poly/rbs_calculator/csv_helper"
+	"github.com/allyourbasepair/rbscalculator"
+	"github.com/allyourbasepair/rbscalculator/csv_helper"
 )
 
 func main() {

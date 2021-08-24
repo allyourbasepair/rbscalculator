@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/TimothyStiles/poly/checks"
+	"github.com/allyourbasepair/rbscalculator/checks"
 )
 
 /******************************************************************************

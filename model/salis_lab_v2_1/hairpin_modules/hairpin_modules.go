@@ -3,7 +3,7 @@ package hairpin_modules
 import (
 	"math"
 
-	. "github.com/TimothyStiles/poly/secondary_structure"
+	. "github.com/allyourbasepair/rbscalculator/secondary_structure"
 )
 
 type HairpinModule struct {

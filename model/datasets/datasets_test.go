@@ -1,6 +1,12 @@
 package model
 
+import (
+	"embed"
+)
+
 func ExampleAdd16SrRNA() {
+	var datasetsDirectory = "datasets"
+	var embeddedDatasetsDirectory embed.FS
 	datasetName := "train"
 	dataset := datasetsDirectory + "/" + datasetName + ".csv"
 	outputCSVFile := datasetsDirectory + "/" + datasetName + "_with_16S.csv"

@@ -4,13 +4,13 @@ import (
 	"math"
 	"sort"
 
-	"github.com/TimothyStiles/poly/energy_params"
-	"github.com/TimothyStiles/poly/linearfold"
-	"github.com/TimothyStiles/poly/mfe"
-	. "github.com/TimothyStiles/poly/rbs_calculator/model"
-	hm "github.com/TimothyStiles/poly/rbs_calculator/model/salis_lab_v2_1/hairpin_modules"
-	"github.com/TimothyStiles/poly/rbs_calculator/model/salis_lab_v2_1/shine_dalgarno_binding_site"
-	. "github.com/TimothyStiles/poly/secondary_structure"
+	"github.com/allyourbasepair/rbscalculator/energy_params"
+	"github.com/allyourbasepair/rbscalculator/linearfold"
+	"github.com/allyourbasepair/rbscalculator/mfe"
+	. "github.com/allyourbasepair/rbscalculator/model"
+	hm "github.com/allyourbasepair/rbscalculator/model/salis_lab_v2_1/hairpin_modules"
+	"github.com/allyourbasepair/rbscalculator/model/salis_lab_v2_1/shine_dalgarno_binding_site"
+	. "github.com/allyourbasepair/rbscalculator/secondary_structure"
 )
 
 /******************************************************************************

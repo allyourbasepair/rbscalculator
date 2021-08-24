@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/TimothyStiles/poly/energy_params"
-	"github.com/TimothyStiles/poly/mfe"
+	"github.com/allyourbasepair/rbscalculator/energy_params"
+	"github.com/allyourbasepair/rbscalculator/mfe"
 )
 
 func ExampleCONTRAFoldV2() {
