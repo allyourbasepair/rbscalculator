@@ -127,7 +127,7 @@ func RibosomeBindingSites(ribosomalRNA, mRNA string, temperatureInCelsius float6
 
 	// sort by length of 5' UTR in ascending order
 	sort.Slice(ribosomeBindingSites, func(i, j int) bool {
-		return ribosomeBindingSites[i].Properties["startPos"].(int) < ribosomeBindingSites[j].Properties["startPos"].(int)
+		return ribosomeBindingSites[i].PropertyValue(rbs_model.StartPosition).(int) < ribosomeBindingSites[j].PropertyValue(rbs_model.StartPosition).(int)
 	})
 	return
 }
@@ -232,13 +232,13 @@ func bindingSiteInformation(bindingSite model.RibosomeBindingSite, includeSequen
 
 	// add the basic important properties of the binding site
 	data := []interface{}{
-		bindingSite.Properties["startPos"],
+		bindingSite.PropertyValue(rbs_model.StartPosition),
 		bindingSite.ProteinCodingSequence[:3],
 		bindingSite.TranslationInitiationRate,
 	}
 
 	// add the additional properties
-	data = append(data, bindingSite.PropertyValues(propertiesToPrintPropertyNames))
+	data = append(data, bindingSite.PropertyValues(propertiesToPrintPropertyNames)...)
 
 	if includeSequences {
 		data = append(data, bindingSite.FivePrimeUTR)
@@ -246,14 +246,14 @@ func bindingSiteInformation(bindingSite model.RibosomeBindingSite, includeSequen
 	}
 
 	if includeStructures {
-		initialState := bindingSite.Properties["usedMRNAStructure"]
+		initialState := bindingSite.PropertyValue(rbs_model.UsedMRNADotBracketStructure)
 		data = append(data, initialState)
 
 		// add the final state structures
-		sdBindingSiteMRNAStructure, sdBindingSiteRRNAStructure := bindingSite.Properties["sdBindingSiteMRNAStructure"].(string), "&"+bindingSite.Properties["sdBindingSiteRRNAStructure"].(string)
-		preRibosomeStructure, postRibosomeStructure := bindingSite.Properties["mrnaPreRibosomeDotBracketStructure"].(string), bindingSite.Properties["mrnaPostRibosomeDotBracketStructure"].(string)
+		sdBindingSiteMRNAStructure, sdBindingSiteRRNAStructure := bindingSite.PropertyValue(rbs_model.SDBindingSiteMRNAStructure), "&"+bindingSite.PropertyValue(rbs_model.SDBindingSiteRRNAStructure).(string)
+		preRibosomeStructure, postRibosomeStructure := bindingSite.PropertyValue(rbs_model.MRNAPreRibosomeDotBracketStructure), bindingSite.PropertyValue(rbs_model.MRNAPostRibosomeDotBracketStructure)
 		ribosomeFootprint := "............."
-		lenSpacingSequence := bindingSite.Properties["lenSpacingSequence"].(int)
+		lenSpacingSequence := bindingSite.PropertyValue(rbs_model.LenSpacingSequence).(int)
 		spacing := make([]rune, 0)
 		for i := 0; i < lenSpacingSequence; i++ {
 			spacing = append(spacing, '.')

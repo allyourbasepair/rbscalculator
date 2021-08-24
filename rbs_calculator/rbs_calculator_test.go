@@ -1,5 +1,10 @@
 package rbs_calculator
 
+import (
+	"github.com/TimothyStiles/poly/rbs_calculator/model"
+	"github.com/TimothyStiles/poly/rbs_calculator/model/salis_lab_v2_1"
+)
+
 var eColi16SrRNA string = Organism16SrRNAMap["Escherichia coli str. K-12 substr. DH10B"]
 
 // `cd` into this directory and run with
@@ -86,8 +91,16 @@ func ExampleRibosomeBindingSites_withPropertiesPrint() {
 	// make sure that each property included here is calculated for each RBS site
 	// check the `PropertiesToCompute` variable (of your RBS calculator model
 	// subpackage) to see the properties that can be printed
-	propertiesToPrint := []RBSPropertyFunc{
-		"dG_total", "dG_standby", "dG_mRNA_rRNA", "dG_spacing", "alignedSpacing", "dG_start", "dG_mRNA", "dG_stack", "spacingSequence"}
+	propertiesToPrint := []model.RBSPropertyFunc{
+		salis_lab_v2_1.TotalFreeEnergy,
+		salis_lab_v2_1.StandbyModuleTotalFreeEnergy,
+		salis_lab_v2_1.MRNARRNAHybridizationFreeEnergy,
+		salis_lab_v2_1.SpacingRegionFreeEnergy,
+		salis_lab_v2_1.AlignedSpacing,
+		salis_lab_v2_1.CDSStartCodonFreeEnergy,
+		salis_lab_v2_1.MRNAFreeEnergy,
+		salis_lab_v2_1.SpacingSequenceStackFreeEnergy,
+	}
 	includeSequences, includeStructures := false, false
 	PrintBindingSites(ribosomeBindingSites, includeSequences, includeStructures, propertiesToPrint...)
 

@@ -77,9 +77,9 @@ func TestComputeProperties_forTrainDataset(t *testing.T) {
 
 		// Step 8: Calculate dG_stack
 		SpacingSequence,
-		dG_stack,
+		SpacingSequenceStackFreeEnergy,
 
-		dG_total,
+		TotalFreeEnergy,
 	}
 
 	model.ComputePropertiesForDataset(datasetName, PropertiesToCompute, propertiesToOutputToCSV, fivePrimeUTRColIdx, cdsColNum, tempColIdx, ribosomalRNAColIdx, otherInformationColIdxNameMap)

@@ -353,7 +353,7 @@ func computeRBSProperties(rbsChannel chan *RibosomeBindingSite,
 			// note: this should be in the same order as the header row above
 			var output []string = rbs.fieldValues()
 			output = append(output, rbs.OtherInformation...)
-			output = append(output, propertyValues...)
+			output = append(output, stringSlice(propertyValues)...)
 
 			csvOutputChannel <- output
 		}
@@ -448,9 +448,9 @@ func (rbs *RibosomeBindingSite) ComputeProperties(properties []RBSPropertyFunc) 
 	return
 }
 
-func (rbs *RibosomeBindingSite) PropertyValues(propertyNames []string) (ret []string) {
+func (rbs *RibosomeBindingSite) PropertyValues(propertyNames []string) (ret []interface{}) {
 	for _, propertyName := range propertyNames {
-		ret = append(ret, toString(rbs.Properties[propertyName]))
+		ret = append(ret, rbs.Properties[propertyName])
 	}
 	return
 }
@@ -462,4 +462,12 @@ func (rbs *RibosomeBindingSite) PropertyValue(property RBSPropertyFunc) interfac
 // toString returns the string value of `i`
 func toString(i interface{}) string {
 	return fmt.Sprint(i)
+}
+
+func stringSlice(interfaceSlice []interface{}) (ret []string) {
+	ret = make([]string, len(interfaceSlice))
+	for i, v := range interfaceSlice {
+		ret[i] = fmt.Sprint(v)
+	}
+	return
 }

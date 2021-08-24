@@ -128,9 +128,9 @@ var PropertiesToCompute []RBSPropertyFunc = []RBSPropertyFunc{
 	// Step 8: Calculate dG_stack
 	SpacingSequence,
 	LenSpacingSequence,
-	dG_stack,
+	SpacingSequenceStackFreeEnergy,
 
-	dG_total,
+	TotalFreeEnergy,
 }
 
 // ShineDalgarnoBindingSite is a type alias for
@@ -855,7 +855,8 @@ var stackingEnergy = map[byte]map[byte]float64{
 	},
 }
 
-func dG_stack(rbs *RibosomeBindingSite) interface{} {
+// SpacingSequenceStackFreeEnergy is the dG_stack term of the model
+func SpacingSequenceStackFreeEnergy(rbs *RibosomeBindingSite) interface{} {
 	spacingSequence := rbs.PropertyValue(SpacingSequence).(string)
 	dG_stack := 0.0
 	for i := 1; i < len(spacingSequence); i++ {
@@ -866,13 +867,14 @@ func dG_stack(rbs *RibosomeBindingSite) interface{} {
 	return dG_stack
 }
 
-func dG_total(rbs *RibosomeBindingSite) interface{} {
+// TotalFreeEnergy (dG_total) is the total free energy of the ribosome binding site
+func TotalFreeEnergy(rbs *RibosomeBindingSite) interface{} {
 	dG_spacing := rbs.PropertyValue(SpacingRegionFreeEnergy).(float64)
 	dG_start := rbs.PropertyValue(CDSStartCodonFreeEnergy).(float64)
 	dG_standby := rbs.PropertyValue(StandbyModuleTotalFreeEnergy).(float64)
 	dG_mRNA_rRNA := rbs.PropertyValue(MRNARRNAHybridizationFreeEnergy).(float64)
 	dG_mRNA := rbs.PropertyValue(MRNAFreeEnergy).(float64)
-	dG_stack := rbs.PropertyValue(dG_stack).(float64)
+	dG_stack := rbs.PropertyValue(SpacingSequenceStackFreeEnergy).(float64)
 	dG_total := dG_standby + dG_mRNA_rRNA + dG_spacing + dG_start + dG_stack - dG_mRNA
 	return dG_total
 }
@@ -882,7 +884,7 @@ Helper functions used to compute properties
 *********************/
 
 func TranslationInitiationRate(rbs RibosomeBindingSite) (translationInitiationRate float64) {
-	totalFreeEnergy := rbs.PropertyValue(dG_total).(float64)
+	totalFreeEnergy := rbs.PropertyValue(TotalFreeEnergy).(float64)
 	// slope, intercept := -0.053698259, 9.329199575
 	// slope, intercept := -0.05490834402441548, 9.353335814085765
 	// slope, intercept := -0.05369825930168624, 9.329199575270719
