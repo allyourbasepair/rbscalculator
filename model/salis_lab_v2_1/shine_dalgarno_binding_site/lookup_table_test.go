@@ -6,8 +6,9 @@ import (
 
 func ExampleLookupTable() {
 	dG_rRNA_mRNA := LookupTable()
-	fmt.Println(dG_rRNA_mRNA["ACCTCCTTA"]["CAAGGAGGG"][37.0])
-	// Output: -11.9
+	sdBindingSite := dG_rRNA_mRNA["ACCUCCUUA"]["AAAAAAUAGG"][30.0]
+	fmt.Println(sdBindingSite.SDFreeEnergy)
+	// Output: -1.0299999713897705
 }
 
 // Test consists of looking up one randomly selected value from each csv file
