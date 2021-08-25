@@ -1,4 +1,4 @@
-This folder contains the datasets used to create our RBS Calculator model.
+This folder contains the datasets used to create a RBS Calculator model.
 
 `source` contains the 1014IC and Flow-Seq datasets. It is not used, but is
 included incase we'd like to regenerate the `train` dataset.
@@ -9,8 +9,8 @@ of the mRNA sequences. 67 sequences from the 1014IC dataset didn't contain
 this information so they were removed. Apart from this, `train` is a copy of
 `source`.
 
-`salis_v2_1.xlsx` contians the predicted output of the sequences in the `train`
-dataset from Salis' RBS Calculator v2.1. This dataset is included to aid in the
+`salis_v2_1.xlsx` contains the predicted output of the sequences in the `train`
+dataset from Salis' RBS Calculator v2.1. This file is included to aid in the
 initial development of our RBS Calculator. The excel file also includes a
 sheet to compare the output from our RBS calculator with the results from
 the RBS Calculator v2.1.
