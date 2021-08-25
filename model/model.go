@@ -471,3 +471,50 @@ func stringSlice(interfaceSlice []interface{}) (ret []string) {
 	}
 	return
 }
+
+/*********************************************************
+The following are generic functions that return the values of the fields
+of a `RibosomeBindingSite` struct.
+
+These functions are used by the `rbs_calculator.PrintBindingSites` func
+to print out the values of the fields of a `RibosomeBindingSite` struct.
+*********************************************************/
+
+// ensureSaneInput ensures sane input
+func ensureSaneInput(rbs *RibosomeBindingSite) interface{} {
+	if len(rbs.ProteinCodingSequence) == 0 || len(rbs.RibosomalRNA) == 0 {
+		panic("the `RibosomeBindingSite` has either no `ProteinCodingSequence` or `RibosomalRNA` set which is required to calculate translation initiation rate")
+	}
+	return nil
+}
+
+// StartPosition makes note of the position at which the protein coding sequence
+// starts in the mRNA sequence. This property is not used in the free energy
+// model, but is added as we need to output the position at which the mRNA
+// sequence is delimited into its five prime UTR and coding sequence.
+func StartPosition(rbs *RibosomeBindingSite) interface{} {
+	return len(rbs.FivePrimeUTR)
+}
+
+var DefaultPropertiesToComputeBefore []RBSPropertyFunc = []RBSPropertyFunc{
+	ensureSaneInput,
+	StartPosition,
+}
+
+func FivePrimeUTR(rbs *RibosomeBindingSite) interface{} {
+	return rbs.FivePrimeUTR
+}
+
+func ProteinCodingSequence(rbs *RibosomeBindingSite) interface{} {
+	return rbs.ProteinCodingSequence
+}
+
+func TranslationInitiationRate(rbs *RibosomeBindingSite) interface{} {
+	return rbs.TranslationInitiationRate
+}
+
+var DefaultPropertiesToComputeAfter []RBSPropertyFunc = []RBSPropertyFunc{
+	FivePrimeUTR,
+	ProteinCodingSequence,
+	TranslationInitiationRate,
+}

@@ -1,8 +1,10 @@
 package salis_lab_v2_1
 
 import (
+	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/allyourbasepair/rbscalculator/energy_params"
 	"github.com/allyourbasepair/rbscalculator/linearfold"
@@ -62,16 +64,14 @@ Functions to compute properties of mRNAs
 // `model.RibosomeBindingSite` struct to calculate its translation initiation
 // rate.
 var PropertiesToCompute []RBSPropertyFunc = []RBSPropertyFunc{
-	ensureSaneInput,
-
 	// Step 1: Initialization of `rbs` struct
-	StartPosition,
 	FivePrimeUTRCutoff,
 	updateFivePrimeUTR,
 	CodingSequenceCutoff,
 	updateCodingSequence,
 
 	// Step 2: Calculate dG_start
+	CDSStartCodon,
 	CDSStartCodonFreeEnergy,
 
 	// Step 3: Find the Shine-Dalgarno Binding Site
@@ -103,6 +103,7 @@ var PropertiesToCompute []RBSPropertyFunc = []RBSPropertyFunc{
 	ShineDalgarnoHybridizationFreeEnergy,
 
 	// Calculate dG_post_ribosome
+	LenRibosomeFootprint,
 	MRNAPostRibosomeSequence,
 	MRNAPostRibosomeDotBracketStructure,
 	PostRibosomeFreeEnergy,
@@ -125,12 +126,17 @@ var PropertiesToCompute []RBSPropertyFunc = []RBSPropertyFunc{
 	HairpinModuleFivePrimeIdx,
 	HairpinModuleThreePrimeIdx,
 
-	// Step 8: Calculate dG_stack
+	// Step 8: Calculate dG_stacking
 	SpacingSequence,
 	LenSpacingSequence,
-	SpacingSequenceStackFreeEnergy,
+	SpacingSequenceStackingFreeEnergy,
 
 	TotalFreeEnergy,
+
+	// other property values for output
+	SpacingSequenceDotBracketStructure,
+	RibosomeFootprintDotBracketStructure,
+	FinalStateDotBracketStructure,
 }
 
 // ShineDalgarnoBindingSite is a type alias for
@@ -158,22 +164,6 @@ This section sets the cutoff values for the
 the `rbs` struct and updates the fields based on their
 cutoff values
 *****************************************************/
-
-// ensureSaneInput ensures sane input
-func ensureSaneInput(rbs *RibosomeBindingSite) interface{} {
-	if len(rbs.ProteinCodingSequence) == 0 || len(rbs.RibosomalRNA) == 0 {
-		panic("the `RibosomeBindingSite` has either no `ProteinCodingSequence` or `RibosomalRNA` set which is required to calculate translation initiation rate")
-	}
-	return nil
-}
-
-// StartPosition makes note of the position at which the protein coding sequence
-// starts in the mRNA sequence. This property is not used in the free energy
-// model, but is added as we need to output the position at which the mRNA
-// sequence is delimited into its five prime UTR and coding sequence.
-func StartPosition(rbs *RibosomeBindingSite) interface{} {
-	return len(rbs.FivePrimeUTR)
-}
 
 // FivePrimeUTRCutoff sets the cutoff of the five prime UTR (from the 3' to 5'
 // direction) to 100 (as specified by The Salis Lab RBS Calc v2.1 model) or to
@@ -243,14 +233,20 @@ var startCodonFreeEnergies map[string]float64 = map[string]float64{
 	"UAG": 19.14,
 }
 
+// CDSStartCodon is the start codon of the coding sequence
+func CDSStartCodon(rbs *RibosomeBindingSite) interface{} {
+	cds := rbs.ProteinCodingSequence
+	if len(cds) < 3 {
+		return ""
+	}
+	return cds[:3]
+
+}
+
 // CDSStartCodonFreeEnergy (dG_start) is the free energy released when the
 // start codon pairs to tRNA-fMet
 func CDSStartCodonFreeEnergy(rbs *RibosomeBindingSite) interface{} {
-	cds := rbs.ProteinCodingSequence
-	if len(cds) < 3 {
-		return 0.0
-	}
-	startCodon := cds[:3]
+	startCodon := rbs.PropertyValue(CDSStartCodon).(string)
 	if dG_start, ok := startCodonFreeEnergies[startCodon]; ok {
 		return dG_start
 	} else {
@@ -356,7 +352,7 @@ func SDBindingSiteMRNAStructure(rbs *RibosomeBindingSite) interface{} {
 func SDBindingSiteRRNAStructure(rbs *RibosomeBindingSite) interface{} {
 	if rbs.PropertyValue(HasShineDalgarnoBindingSite).(bool) {
 		sdBindingSite := *(rbs.PropertyValue(shineDalgarnoBindingSite).(*ShineDalgarnoBindingSite))
-		return sdBindingSite.RibosomalRNAStructure
+		return "&" + sdBindingSite.RibosomalRNAStructure
 	}
 	return ""
 }
@@ -589,19 +585,24 @@ func duplexFreeEnergyAdjustment(temperature float64) float64 {
 Calculate dG_post_ribosome
 **********************************/
 
+// as per https://pubmed.ncbi.nlm.nih.gov/28158713/, length of the ribosome
+// footprint is 13 nucleotides from the start codon, so we reduce start the
+// coding sequence from its 13th nucleotide
+func LenRibosomeFootprint(rbs *RibosomeBindingSite) interface{} {
+	return 13
+}
+
 // MRNAPostRibosomeSequence is the mRNA sequence after the footprint of the
 // ribosome
 func MRNAPostRibosomeSequence(rbs *RibosomeBindingSite) interface{} {
 	cds := rbs.ProteinCodingSequence
-	// as per https://pubmed.ncbi.nlm.nih.gov/28158713/, length of the ribosome
-	// footprint is 13 nucleotides from the start codon, so we reduce start the
-	// coding sequence from its 13th nucleotide
-	postRibosomeStartIdx := 13
+	lenRibosomeFootprint := rbs.PropertyValue(LenRibosomeFootprint).(int)
+
 	lenCDS := len(cds)
-	if lenCDS < postRibosomeStartIdx+1 {
-		postRibosomeStartIdx = lenCDS
+	if lenCDS < lenRibosomeFootprint+1 {
+		lenRibosomeFootprint = lenCDS
 	}
-	return cds[postRibosomeStartIdx:]
+	return cds[lenRibosomeFootprint:]
 }
 
 // MRNAPostRibosomeDotBracketStructure is the folded dot-bracket structure of
@@ -806,7 +807,7 @@ func HairpinModuleThreePrimeIdx(rbs *RibosomeBindingSite) interface{} {
 }
 
 /*****************************************************
-Step 8: Calculate dG_stack
+Step 8: Calculate dG_stacking
 *****************************************************/
 
 // SpacingSequence is the nucleotide sequence which separates the end of the
@@ -855,16 +856,16 @@ var stackingEnergy = map[byte]map[byte]float64{
 	},
 }
 
-// SpacingSequenceStackFreeEnergy is the dG_stack term of the model
-func SpacingSequenceStackFreeEnergy(rbs *RibosomeBindingSite) interface{} {
+// SpacingSequenceStackingFreeEnergy is the dG_stacking term of the model
+func SpacingSequenceStackingFreeEnergy(rbs *RibosomeBindingSite) interface{} {
 	spacingSequence := rbs.PropertyValue(SpacingSequence).(string)
-	dG_stack := 0.0
+	dG_stacking := 0.0
 	for i := 1; i < len(spacingSequence); i++ {
 		currNucleotide := spacingSequence[i]
 		prevNucleotide := spacingSequence[i-1]
-		dG_stack += stackingEnergy[currNucleotide][prevNucleotide]
+		dG_stacking += stackingEnergy[currNucleotide][prevNucleotide]
 	}
-	return dG_stack
+	return dG_stacking
 }
 
 // TotalFreeEnergy (dG_total) is the total free energy of the ribosome binding site
@@ -874,16 +875,64 @@ func TotalFreeEnergy(rbs *RibosomeBindingSite) interface{} {
 	dG_standby := rbs.PropertyValue(StandbyModuleTotalFreeEnergy).(float64)
 	dG_mRNA_rRNA := rbs.PropertyValue(MRNARRNAHybridizationFreeEnergy).(float64)
 	dG_mRNA := rbs.PropertyValue(MRNAFreeEnergy).(float64)
-	dG_stack := rbs.PropertyValue(SpacingSequenceStackFreeEnergy).(float64)
-	dG_total := dG_standby + dG_mRNA_rRNA + dG_spacing + dG_start + dG_stack - dG_mRNA
+	dG_stacking := rbs.PropertyValue(SpacingSequenceStackingFreeEnergy).(float64)
+	dG_total := dG_standby + dG_mRNA_rRNA + dG_spacing + dG_start + dG_stacking - dG_mRNA
 	return dG_total
 }
 
+// SpacingSequenceDotBracketStructure is the structure of the spacing sequence.
+// Since the model doesn't allow folding in the spacing sequence in the final
+// state, the spacing sequence will never have any base pairs.
+func SpacingSequenceDotBracketStructure(rbs *RibosomeBindingSite) interface{} {
+	lenSpacingSequence := rbs.PropertyValue(LenSDSequence).(int)
+	return dotString(lenSpacingSequence)
+}
+
+// RibosomeFootprintDotBracketStructure is the structure of the ribosome
+// print. Since the model doesn't allow folding in the region under the
+// ribosome, the ribosome footprint will never have any base pairs.
+func RibosomeFootprintDotBracketStructure(rbs *RibosomeBindingSite) interface{} {
+	lenRibosomeFootprint := rbs.PropertyValue(LenRibosomeFootprint).(int)
+	return dotString(lenRibosomeFootprint)
+}
+
+func FinalStateDotBracketStructure(rbs *RibosomeBindingSite) interface{} {
+	finalStateStructureProperties := []RBSPropertyFunc{
+		MRNAPreRibosomeDotBracketStructure,
+		SDBindingSiteMRNAStructure,
+		SpacingSequenceDotBracketStructure,
+		RibosomeFootprintDotBracketStructure,
+		MRNAPostRibosomeDotBracketStructure,
+		SDBindingSiteRRNAStructure,
+	}
+	finalStateStructurePropertiesNames := FunctionNames(finalStateStructureProperties)
+	finalStateStructurePropertiesValues := rbs.PropertyValues(finalStateStructurePropertiesNames)
+
+	finalStateStructure := strings.Join(stringSlice(finalStateStructurePropertiesValues), "")
+	return finalStateStructure
+}
+
+func dotString(length int) string {
+	ret := make([]rune, 0)
+	for i := 0; i < length; i++ {
+		ret = append(ret, '.')
+	}
+	return string(ret)
+}
+
+func stringSlice(interfaceSlice []interface{}) (ret []string) {
+	ret = make([]string, len(interfaceSlice))
+	for i, v := range interfaceSlice {
+		ret[i] = fmt.Sprint(v)
+	}
+	return
+}
+
 /********************
-Helper functions used to compute properties
+End of model properties
 *********************/
 
-func TranslationInitiationRate(rbs RibosomeBindingSite) (translationInitiationRate float64) {
+func ComputeTranslationInitiationRate(rbs RibosomeBindingSite) (translationInitiationRate float64) {
 	totalFreeEnergy := rbs.PropertyValue(TotalFreeEnergy).(float64)
 	// slope, intercept := -0.053698259, 9.329199575
 	// slope, intercept := -0.05490834402441548, 9.353335814085765

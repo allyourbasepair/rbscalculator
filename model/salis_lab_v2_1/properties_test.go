@@ -24,7 +24,6 @@ func TestComputeProperties_forTrainDataset(t *testing.T) {
 
 	propertiesToOutputToCSV := []model.RBSPropertyFunc{
 		// Step 1: Initialization of `rbs` struct
-		StartPosition,
 		FivePrimeUTRCutoff,
 		CodingSequenceCutoff,
 
@@ -77,7 +76,7 @@ func TestComputeProperties_forTrainDataset(t *testing.T) {
 
 		// Step 8: Calculate dG_stack
 		SpacingSequence,
-		SpacingSequenceStackFreeEnergy,
+		SpacingSequenceStackingFreeEnergy,
 
 		TotalFreeEnergy,
 	}

@@ -5,7 +5,6 @@ import (
 	"os"
 	"regexp"
 	"sort"
-	"strings"
 
 	"github.com/allyourbasepair/rbscalculator/model"
 	rbs_model "github.com/allyourbasepair/rbscalculator/model/salis_lab_v2_1"
@@ -15,14 +14,17 @@ import (
 /*****************************************************
 June, 5, 2021
 The Ribosome Binding Site Calculator
+
 Translation is the process by which a messenger RNA (mRNA) is 'decoded' to a
 protein by a ribosome.
+
 When trying to synthesize proteins of our choice, we have to design a mRNA
 sequence with a  5' untranslated region, the protein coding sequence and a
 terminator sequence. The ribosome's interaction with the mRNA sequence
 determines the amount of the protein that will be synthesized. Thus, we need
 a model to understand these interactions and how they relate to the amount of
 protein produced.
+
 The ribosome binding site calculator returns a list of potential places (binding
 sites) a ribosome might bind to a mRNA. Each binding site breaks down a mRNA
 sequence into a 5' untranslated region and protein coding sequence, and includes
@@ -30,21 +32,26 @@ information about the predicted translation rate of that binding site. This is
 useful because it allows one to examine where a ribosome is likely to bind to
 the mRNA sequence by examining the relative differences between the translation
 initiation rates of each binding site.
+
 The other intended use of this calculator is to help one increase synthesis of
 a desired protein by the user re-desinging their mRNA sequence to increase
 translation initiation rate which should lead to an increase in the amount of
 the protein produced in-vitro.
+
 How the calculator works:
 To calculate the translation initiation rate of a binding site, we need a model
 of a ribosome's interactions with a mRNA strand and the relationship of the
 interactions with the translation initiation rate of the coding sequence of the
 mRNA strand.
+
 The current model of this RBS calculator is based upon the research done by
 The Salis Lab at The Penn State University. For more information on this model,
 please have a look at the `properties.go` file in the `salis_lab_v2_1`
 subpackage (./model/salis_lab_v2_1/properties.go).
+
 For information of how to develop a RBS Calculator of your own, please
 have a look at the `model.go` file in the `model` subpackage (./model/model.go).
+
 *****************************************************/
 
 // StartCodon specifies the start codon of the protein coding sequence of a
@@ -119,7 +126,7 @@ func RibosomeBindingSites(ribosomalRNA, mRNA string, temperatureInCelsius float6
 
 	// sort by length of 5' UTR in ascending order
 	sort.Slice(ribosomeBindingSites, func(i, j int) bool {
-		return ribosomeBindingSites[i].PropertyValue(rbs_model.StartPosition).(int) < ribosomeBindingSites[j].PropertyValue(rbs_model.StartPosition).(int)
+		return ribosomeBindingSites[i].PropertyValue(model.StartPosition).(int) < ribosomeBindingSites[j].PropertyValue(model.StartPosition).(int)
 	})
 	return
 }
@@ -140,7 +147,7 @@ func SortByTranslationInitiationRate(ribosomeBindingSites []model.RibosomeBindin
 // ribsome binding site as well as the binding site with the properties
 // computed to calculate the translation initiation rate
 func TranslationInitiationRate(fivePrimeUTR, proteinCodingSequence, ribosomalRNA string, temperateureInCelsius float64) (translationInitiationRate float64, bindingSiteWithProperties model.RibosomeBindingSite) {
-	ribosomeBindingSite := model.RibosomeBindingSite{
+	rbs := model.RibosomeBindingSite{
 		FivePrimeUTR:          fivePrimeUTR,
 		ProteinCodingSequence: proteinCodingSequence,
 		Temperature:           temperateureInCelsius,
@@ -153,17 +160,20 @@ func TranslationInitiationRate(fivePrimeUTR, proteinCodingSequence, ribosomalRNA
 
 	// compute the properties of the interactions between the mRNA strand
 	// and ribosome required to calculate the translation initiation rate
-	ribosomeBindingSite.ComputeProperties(rbs_model.PropertiesToCompute)
+	rbs.ComputeProperties(model.DefaultPropertiesToComputeBefore)
+	rbs.ComputeProperties(rbs_model.PropertiesToCompute)
 
 	// calculate the translation initiation rate
-	translationInitiationRate = rbs_model.TranslationInitiationRate(ribosomeBindingSite)
-	ribosomeBindingSite.TranslationInitiationRate = translationInitiationRate
+	translationInitiationRate = rbs_model.ComputeTranslationInitiationRate(rbs)
+	rbs.TranslationInitiationRate = translationInitiationRate
 
-	if ribosomeBindingSite.TranslationInitiationRate == inf {
+	rbs.ComputeProperties(model.DefaultPropertiesToComputeAfter)
+
+	if rbs.TranslationInitiationRate == inf {
 		panic("failed to calculate the translation initiation rate for the mRNA sequence. ensure the `TranslationInitiationRate` field of the `model.RibosomeBindingSite` struct is set by the `rbs_model.TranslationInitiationRate` func.")
 	}
 
-	return translationInitiationRate, ribosomeBindingSite
+	return translationInitiationRate, rbs
 }
 
 // PrintBindingSites prints the important properties of a binding site.
@@ -172,46 +182,38 @@ func TranslationInitiationRate(fivePrimeUTR, proteinCodingSequence, ribosomalRNA
 // case-sensitive and must match one of the properties available in the
 // `model.RibosomeBindingSite.Properties` map after the properties of a binding
 // site have been computed.
-func PrintBindingSites(bindingSites []model.RibosomeBindingSite, includeSequences, includeStructures bool, propertiesToPrint ...model.RBSPropertyFunc) {
+func PrintBindingSites(bindingSites []model.RibosomeBindingSite, includeSequences, includeStructures bool, additionalPropertiesToPrint ...PropertyToPrint) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetRowLine(true)
 	table.SetAutoFormatHeaders(false)
 
 	// add the basic important properties of the binding site
-	header := []string{
-		"Start position",
-		"Start codon",
-		"TIR",
+	propertiesToPrint := []PropertyToPrint{
+		{property: model.StartPosition, columnHeader: "Start position"},
+		{property: model.TranslationInitiationRate, columnHeader: "TIR"},
 	}
 
 	// add the additional properties
-	header = append(header, model.FunctionNames(propertiesToPrint)...)
+	propertiesToPrint = append(propertiesToPrint, additionalPropertiesToPrint...)
 
 	if includeSequences {
-		header = append(header, "5' Untranslated Region")
-		header = append(header, "Protein Coding Sequence")
+		sequenceProperties := []PropertyToPrint{
+			{property: model.FivePrimeUTR, columnHeader: "5' Untranslated Region"},
+			{property: model.ProteinCodingSequence, columnHeader: "Protein Coding Sequence"},
+		}
+
+		propertiesToPrint = append(propertiesToPrint, sequenceProperties...)
 	}
 
 	if includeStructures {
-		header = append(header, "Initial state")
-
-		// add the final state headers
-		header = append(header, "Final state (pre ribosome)")
-		header = append(header, "Final state (mRNA shine dalgarno binding site)")
-		header = append(header, "Final state (spacing)")
-		header = append(header, "Final state (ribosome footprint)")
-		header = append(header, "Final state (post ribosome)")
-		header = append(header, "Final state (16S rRNA shine dalgarno binding site)")
-		header = append(header, "Full final state")
+		propertiesToPrint = append(propertiesToPrint, salisLabV2_1StructureProperties...)
 	}
 
-	table.SetHeader(header)
-
-	propertiesToPrintPropertyNames := model.FunctionNames(propertiesToPrint)
+	table.SetHeader(propertiesToPrintHeader(propertiesToPrint))
 
 	// add the relevant information for each binding site
 	for _, bindingSite := range bindingSites {
-		bindingSiteInfo := bindingSiteInformation(bindingSite, includeSequences, includeStructures, propertiesToPrintPropertyNames)
+		bindingSiteInfo := rbsPropertyValues(bindingSite, propertiesToPrint)
 		table.Append(bindingSiteInfo)
 	}
 
@@ -219,53 +221,40 @@ func PrintBindingSites(bindingSites []model.RibosomeBindingSite, includeSequence
 	table.Render()
 }
 
-// returns the information of a binding site
-func bindingSiteInformation(bindingSite model.RibosomeBindingSite, includeSequences, includeStructures bool, propertiesToPrintPropertyNames []string) (ret []string) {
-
-	// add the basic important properties of the binding site
-	data := []interface{}{
-		bindingSite.PropertyValue(rbs_model.StartPosition),
-		bindingSite.ProteinCodingSequence[:3],
-		bindingSite.TranslationInitiationRate,
+func propertiesToPrintHeader(properties []PropertyToPrint) (ret []string) {
+	for _, propertyToPrint := range properties {
+		ret = append(ret, propertyToPrint.columnHeader)
 	}
-
-	// add the additional properties
-	data = append(data, bindingSite.PropertyValues(propertiesToPrintPropertyNames)...)
-
-	if includeSequences {
-		data = append(data, bindingSite.FivePrimeUTR)
-		data = append(data, bindingSite.ProteinCodingSequence)
-	}
-
-	if includeStructures {
-		initialState := bindingSite.PropertyValue(rbs_model.UsedMRNADotBracketStructure)
-		data = append(data, initialState)
-
-		// add the final state structures
-		sdBindingSiteMRNAStructure, sdBindingSiteRRNAStructure := bindingSite.PropertyValue(rbs_model.SDBindingSiteMRNAStructure), "&"+bindingSite.PropertyValue(rbs_model.SDBindingSiteRRNAStructure).(string)
-		preRibosomeStructure, postRibosomeStructure := bindingSite.PropertyValue(rbs_model.MRNAPreRibosomeDotBracketStructure), bindingSite.PropertyValue(rbs_model.MRNAPostRibosomeDotBracketStructure)
-		ribosomeFootprint := "............."
-		lenSpacingSequence := bindingSite.PropertyValue(rbs_model.LenSpacingSequence).(int)
-		spacing := make([]rune, 0)
-		for i := 0; i < lenSpacingSequence; i++ {
-			spacing = append(spacing, '.')
-		}
-		finalState := []interface{}{preRibosomeStructure, sdBindingSiteMRNAStructure, string(spacing), ribosomeFootprint, postRibosomeStructure, sdBindingSiteRRNAStructure}
-		data = append(data, finalState...)
-		fullFinalState := strings.Join(stringSlice(finalState), "")
-		data = append(data, fullFinalState)
-	}
-
-	ret = stringSlice(data)
 	return
 }
 
-func stringSlice(interfaceSlice []interface{}) (ret []string) {
-	ret = make([]string, len(interfaceSlice))
-	for i, v := range interfaceSlice {
-		ret[i] = fmt.Sprint(v)
+// returns the information of a binding site
+func rbsPropertyValues(rbs model.RibosomeBindingSite, properties []PropertyToPrint) (ret []string) {
+	for _, propertyToPrint := range properties {
+		ret = append(ret, toString(rbs.PropertyValue(propertyToPrint.property)))
 	}
 	return
+}
+
+// toString returns the string value of `i`
+func toString(i interface{}) string {
+	return fmt.Sprint(i)
+}
+
+type PropertyToPrint struct {
+	property     model.RBSPropertyFunc
+	columnHeader string
 }
 
 var inf float64 = 1000000000.0
+
+var salisLabV2_1StructureProperties []PropertyToPrint = []PropertyToPrint{
+	{property: rbs_model.UsedMRNADotBracketStructure, columnHeader: "Initial state"},
+	{property: rbs_model.MRNAPreRibosomeDotBracketStructure, columnHeader: "Final state (pre ribosome)"},
+	{property: rbs_model.SDBindingSiteMRNAStructure, columnHeader: "Final state (mRNA shine dalgarno binding site)"},
+	{property: rbs_model.SpacingSequenceDotBracketStructure, columnHeader: "Final state (spacing)"},
+	{property: rbs_model.RibosomeFootprintDotBracketStructure, columnHeader: "Final state (ribosome footprint)"},
+	{property: rbs_model.MRNAPostRibosomeDotBracketStructure, columnHeader: "Final state (post ribosome)"},
+	{property: rbs_model.SDBindingSiteRRNAStructure, columnHeader: "Final state (16S rRNA shine dalgarno binding site)"},
+	{property: rbs_model.FinalStateDotBracketStructure, columnHeader: "Full final state"},
+}
