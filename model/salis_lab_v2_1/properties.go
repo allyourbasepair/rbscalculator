@@ -33,36 +33,9 @@ model, please have a look at:
 
 ******************************************************************************/
 
-/***********************
-// Steps:
-// 1. Set mRNA to 5p UTR + first 35 nts of CDS
-// -> Fold with RNAfold (no dangling and 2007 params) to get dG_mRNA
-// 2. Cofold 5p UTR with 16S rRNA
-// -> Note down most 5p and 3p of binding site
-// 3. Get dG_pre_ribosome by folding from start of 5pUTR to 5p annd then using
-// RNAeval to calculate dG.
-// 4. Calculate dG_SD_aSD by passing only basepairs folded to aSD to RNAeval. Add
-// _calc_dG_init_adjustment to the value.
-// 5. Fold the post ribosome sequences (nts 14 to 35 of CDS) to get dG_post_ribosome
-// 6. Add dG_start based on start codon lookup value.
-// 7. Add dG_spacing based on aligned spacing between SD and CDS.
-// 8. Pass pre_ribosome sequence to get all hairpin modules.
-// 9. For each module, successively unfold pairs from the base of the hairpins.
-// Keep track of the energy require to break that base pair as dG_unfolding and
-// keep track of the dG_distortion (energy due to amount of available surface area).
-// Choose dG_distortion and dG_unfolding that minimises the sum of the two.
-// 10. For each module, get the height of all the downstream hairpins and add a
-// penalising dG_sliding term to the module.
-// 11. Choose the module that minimises the dG_standby term.
-// 12. Compute dG_total and translation initaltion rate
-
-
-Functions to compute properties of mRNAs
-***********************/
-
 // PropertiesToCompute list the properties that need to be computed for a
 // `model.RibosomeBindingSite` struct to calculate its translation initiation
-// rate.
+// rate for the Salis Lab v2.1 model.
 var PropertiesToCompute []RBSPropertyFunc = []RBSPropertyFunc{
 	// Step 1: Initialization of `rbs` struct
 	FivePrimeUTRCutoff,
@@ -133,7 +106,7 @@ var PropertiesToCompute []RBSPropertyFunc = []RBSPropertyFunc{
 
 	TotalFreeEnergy,
 
-	// other property values for output
+	// other property values only for output
 	SpacingSequenceDotBracketStructure,
 	RibosomeFootprintDotBracketStructure,
 	FinalStateDotBracketStructure,
@@ -880,6 +853,10 @@ func TotalFreeEnergy(rbs *RibosomeBindingSite) interface{} {
 	return dG_total
 }
 
+/*****************************************************
+Other property values only for output
+*****************************************************/
+
 // SpacingSequenceDotBracketStructure is the structure of the spacing sequence.
 // Since the model doesn't allow folding in the spacing sequence in the final
 // state, the spacing sequence will never have any base pairs.
@@ -889,13 +866,20 @@ func SpacingSequenceDotBracketStructure(rbs *RibosomeBindingSite) interface{} {
 }
 
 // RibosomeFootprintDotBracketStructure is the structure of the ribosome
-// print. Since the model doesn't allow folding in the region under the
+// footprint. Since the model doesn't allow folding in the region under the
 // ribosome, the ribosome footprint will never have any base pairs.
 func RibosomeFootprintDotBracketStructure(rbs *RibosomeBindingSite) interface{} {
 	lenRibosomeFootprint := rbs.PropertyValue(LenRibosomeFootprint).(int)
 	return dotString(lenRibosomeFootprint)
 }
 
+// FinalStateDotBracketStructure is the structure of the ribosome binding site
+// after all free energy interactions have taken place. It is the concatenation
+// of the structure of the folded mRNA sequence pre-ribosome, the structure of
+// the shine-dalgarno binding site on the mRNA sequence, the structure of the
+// spacing region before the coding sequence, the structure of the ribosome
+// footprint, the structure of the folded mRNA sequence post-ribosome, and
+// the structure of the shine-dalgarno binding site on the rRNA sequence.
 func FinalStateDotBracketStructure(rbs *RibosomeBindingSite) interface{} {
 	finalStateStructureProperties := []RBSPropertyFunc{
 		MRNAPreRibosomeDotBracketStructure,
@@ -905,13 +889,14 @@ func FinalStateDotBracketStructure(rbs *RibosomeBindingSite) interface{} {
 		MRNAPostRibosomeDotBracketStructure,
 		SDBindingSiteRRNAStructure,
 	}
-	finalStateStructurePropertiesNames := FunctionNames(finalStateStructureProperties)
+	finalStateStructurePropertiesNames := FuncNames(finalStateStructureProperties)
 	finalStateStructurePropertiesValues := rbs.PropertyValues(finalStateStructurePropertiesNames)
 
 	finalStateStructure := strings.Join(stringSlice(finalStateStructurePropertiesValues), "")
 	return finalStateStructure
 }
 
+// dotString returns a string of dots (`.`) of length `length`
 func dotString(length int) string {
 	ret := make([]rune, 0)
 	for i := 0; i < length; i++ {
@@ -920,6 +905,8 @@ func dotString(length int) string {
 	return string(ret)
 }
 
+// stringSlice converts each variable of `interfaceSlice` to a string and
+// returns the resulting string slice
 func stringSlice(interfaceSlice []interface{}) (ret []string) {
 	ret = make([]string, len(interfaceSlice))
 	for i, v := range interfaceSlice {
@@ -928,10 +915,12 @@ func stringSlice(interfaceSlice []interface{}) (ret []string) {
 	return
 }
 
-/********************
+/******************************************************************************
 End of model properties
-*********************/
+******************************************************************************/
 
+// ComputeTranslationInitiationRate computes the translation initiation rate
+// of a ribosome binding site according to the Salis Lab v2.1 model
 func ComputeTranslationInitiationRate(rbs RibosomeBindingSite) (translationInitiationRate float64) {
 	totalFreeEnergy := rbs.PropertyValue(TotalFreeEnergy).(float64)
 	// slope, intercept := -0.053698259, 9.329199575
