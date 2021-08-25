@@ -1,18 +1,17 @@
-package model
+// +build gen_csv
 
-import (
-	"embed"
-)
+// Since we don't want the tests below to run when `go test ./...` is used, the
+// above build contrain flag ensures the tests below are only run when we pass
+// the `gen_csv` tag to go test with the tags argument
+// (`go test ./... -tags gen_csv`).
+
+package datasets
 
 func ExampleAdd16SrRNA() {
-	var datasetsDirectory = "datasets"
-	var embeddedDatasetsDirectory embed.FS
 	datasetName := "train"
-	dataset := datasetsDirectory + "/" + datasetName + ".csv"
-	outputCSVFile := datasetsDirectory + "/" + datasetName + "_with_16S.csv"
-	organismColIdx, rrnaColIdx := 2, 9
-	add16SrRNA(embeddedDatasetsDirectory, dataset, outputCSVFile, organismColIdx, rrnaColIdx)
+	organismColIdx := 2
+	add16SrRNA(datasetName, organismColIdx)
 
 	// Output:
-	// confirm results and rename "<datasetName>_with_16S.csv" to "<datasetName>.csv"
+	// confirm results and rename "./with_16s_rRNA/<datasetName>_<timestamp>.csv" to "<datasetName>.csv"
 }

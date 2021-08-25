@@ -1,14 +1,18 @@
+// +build gen_csv
+
+// Since we don't want the tests below to run when `go test ./...` is used, the
+// above build contrain flag ensures the tests below are only run when we pass
+// the `gen_csv` tag to go test with the tags argument
+// (`go test ./... -tags gen_csv`).
 package salis_lab_v2_1
 
 import (
-	"testing"
-
 	"github.com/allyourbasepair/rbscalculator/model"
 )
 
 // `cd` into this directory and run with
-// `go test -timeout 0 -run ^TestComputeProperties_forTrainDataset`
-func TestComputeProperties_forTrainDataset(t *testing.T) {
+// `go test -timeout 0 -run ^ExampleComputeProperties_forTrainDataset`
+func ExampleComputeProperties_forTrainDataset() {
 	datasetName := "train"
 
 	idColIdx, datasetColIdx, organismColIdx, tempColIdx, proteinColIdx, fivePrimeUTRColIdx, cdsColNum, proteinMeanColIdx, proteinStdColIdx, ribosomalRNAColIdx := 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
