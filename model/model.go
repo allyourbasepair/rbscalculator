@@ -1,7 +1,6 @@
 package model
 
 import (
-	"embed"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -10,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/allyourbasepair/rbscalculator/csv_helper"
+	"github.com/allyourbasepair/rbscalculator/model/datasets"
 )
 
 /*****************************************************************************
@@ -52,15 +52,15 @@ For an example, please have a look at the `properties.go` file in the
 Once the code is written to compute your desired properties, we have to run
 the ground-truth dataset against your code to generate properties for all the
 data points in the dataset. This package exports the function
-`ComputeProperties` which takes each data point in the 'ground-truth' dataset,
-computes the properties you've specified, and outputs a csv file in a directory
-named `dataset_with_properties` in your subpackage.
+`ComputePropertiesForDataset` which takes each data point in the
+'ground-truth' dataset, computes the properties you've specified, and outputs a
+csv file in a directory named `dataset_with_properties` in your subpackage.
 
 Please see the `properties_test.go` file in the `salis_lab_v2_1` subpackage
 (./salis_lab_v2_1/properties.go) to understand how to create a dataset with
 your computed properties.
 You can see an example of the dataset file after properties have been computed
-(./salis_lab_v2_1/dataset_with_properties/train.csv).
+(./salis_lab_v2_1/dataset_with_properties/train_*.csv).
 
 
 Visualization & Quantitative Relationship Formalization:
@@ -75,14 +75,14 @@ between a computed property and the ground-truth protein levels.
 Once we can see a (linear, quadratic, cubic) relationship between a variable
 and the outcome, we can figure out the quantitative relationship through
 curve-fitting apps like MATLAB and add this quantitative relationship to our
-model.
+model. Other quantitative analysis software like Excel can be helpful here.
 
 Unfortunately, guidance to do this step is not yet included in this repo as
 we've based our first calculator on research papers from The Salis Lab which
 have included the quantitative relationship between properties and the
 resulting protein levels. We hope to include this information and a workflow
 for this step in the future if / when the model of the RBS calculator is
-improved.
+improved. PRs are very welcome.
 
 
 Final Model Equation:
@@ -97,55 +97,54 @@ actually improve the predicted results. The least set of variables with the
 highest correlation with actual results are then used in the model.
 
 Unfortunately, as in the step above, guidance to do this is not included in
-this repo as we've not had to do this yet.
+this repo as we've not had to do this yet. PRs are very welcome.
 
 
 Implementation details to create a model:
-To create a model, create a subpackage in the `model` package with a
-`properties.go` file. This file must include the following:
+To create a model, the following must be done -
 * Create a subpackage in the `model` package with a `properties.go` file.
 * The `properties.go` file should include a `PropertiesToCompute` variable of
-  type `[]Property`.
-	The value returned by each `ComputePropertyFn` in `PropertiesToCompute` is
+  type `[]RBSPropertyFunc`.
+	The value returned by each `RBSPropertyFunc` in `PropertiesToCompute` is
 	added to the `Properties` map (the key in the map is the name of the
-	`ComputePropertyFn`) of the `RibosomeBindingSite` struct. Thus, the order of
+	`RBSPropertyFunc`) of the `RibosomeBindingSite` struct. Thus, the order of
 	the properties in `PropertiesToCompute` is important and properties later in
 	the `PropertiesToCompute` slice can use the values of properties earlier in
-	the slice by accessing the relevant value using the `ComputePropertyFn` name
+	the slice by accessing the relevant value using the `RBSPropertyFunc` name
 	of the earlier property.
+	(Since the name of the `RBSPropertyFunc` you create is likely to change, there
+	is a helper func `PropertyValue` that takes a `RBSPropertyFunc`, gets its
+	name as a string and then returns the value from the `Properties` field
+	of a `RibosomeBindingSite` struct.)
 * Create a copy of `properties_test.go` from the `salis_lab_v2_1` subpackage
 	into your own subpackage. You will have to update the name of the package on
-	the top of the file. Then compute the properties you wrote by `cd`ing into
+	the top of the file. Update the `propertiesToOutputToCSV` to include
+	properties you created that you would like to output to the CSV.
+	Finally, create the dataset with your computed properties by `cd`ing into
 	the directory of your subpackage and running
-	`go test -timeout 0 -run ^TestComputeProperties`.
+	`go test -timeout 0 -run ^TestComputeProperties_forTrainDataset`.
 * You will now have a csv file with your computed properties for each data
-	point in the source dataset. At this point, you will have to curve-fit and
+	point in the `train` dataset. At this point, you will have to curve-fit and
 	quantitatively figure out the relationship between the values of each computed
 	property and their relationship to the actual protein mean and protein std
 	values. (As mentioned above, we don't provide guidance on this step currently.
 	Excel and MATLAB are useful tools for this. PRs are very welcome.)
 * Update your `properties.go` file to include the quantitative relationships
 	from the previous step.
-* Finally, create a function named `TranslationInitiationRate` of type
+* Finally, create a function named `ComputeTranslationInitiationRate` of type
 	`func(RibosomeBindingSite) float64` that returns the translation initiation
 	rate for a ribosome binding site.
 * Update `rbs_calculator.go` in the `rbs_calculator` package to use your model
 	by updating the `rbs_model` import at the top of the file.
 
+For an example, have a look at the `properties.go` and `properties_test.go`
+files in the `salis_lab_v2_1` package.
+
 To compute statistics for your model, read the documentation of `stats.py`.
 
 *****************************************************************************/
 
-//go:embed datasets/*
-var embeddedDatasetsDirectory embed.FS
-var datasetsDirectory = "datasets"
-
-// RibosomeBindingSite contains all the 'ground-truth' information of a mRNA
-// sequence. This struct is used to create a model for the rbs calculator (
-// please read the description of the `model.ComputeProperties` func for more
-// information), and is used for inference (please see the code in the
-// `TranslationInitiationRate` func in the `rbs_calculator` package for more
-// information).
+// RibosomeBindingSite is a struct to represent a ribosome binding site.
 type RibosomeBindingSite struct {
 	// FivePrimeUTR is the untranslated region of the mRNA sequence on the five
 	// prime end
@@ -161,23 +160,16 @@ type RibosomeBindingSite struct {
 	Properties map[string]interface{}
 	// OtherInformation contains information that we'd like to output to the
 	// dataset with properties, but is not used to compute properties of a
-	// binding site
+	// binding site. This field is used by the `ComputePropertiesForDataset` func.
 	OtherInformation []string
 	// TranslationInitiationRate is the computed translation initiation rate for
-	// this binding site. Please note that this field is only set when infering
+	// this binding site. Please note that this field is only set during inference
 	// in the `TranslationInitiationRate` func in the `rbs_calculator` package
 	TranslationInitiationRate float64
 }
 
-// Property contains information about the properties that need to be computed
-// for a binding site (and whether or not to include the computed property in
-// the csv outputted to the `dataset_with_properties` directory after calling
-// the `ComputeProperties` func)
-// type Property struct {
-// 	ComputePropertyFn  func(*RibosomeBindingSite) interface{}
-// 	IncludeInOutputCSV bool
-// }
-
+// RBSPropertyFunc is the type of a func that can be used to compute a property
+// for the `RibosomeBindingSite` struct
 type RBSPropertyFunc (func(*RibosomeBindingSite) interface{})
 
 // CleanRNA converts DNA to RNA and makes sequence upper case
@@ -188,28 +180,26 @@ func CleanRNA(rna string) string {
 	return rna
 }
 
-// ComputePropertiesForDataset creates a `RibosomeBindingSite` struct for each data point
-// in the input dataset, computes the desired properties (the
-// `propertiesToCompute` argument), and outputs each `RibosomeBindingSite`
-// struct after the properties have been computed to a CSV in the
-// `dataset_with_properties` directory in the package this function is called
-// from.
+// ComputePropertiesForDataset creates a `RibosomeBindingSite` struct for each
+// data point in the input dataset, computes the desired properties (the
+// `propertiesToCompute` argument), and outputs the selected properties of each
+// `RibosomeBindingSite` struct (the `propertiesToOutputToCSV` argument) to a
+// CSV in the `dataset_with_properties` directory in the package this function
+// is called from.
 //
-// The computed properties that are included in the output csv file is
-// controlled by the `IncludeInOutputCSV` field of the `Property` struct.
-//
-// The source dataset may contain information that we'd like to include the
+// The input dataset may contain information that we'd like to include the
 // output csv which may not be part of the `RibosomeBindingSite` struct.
 // The `otherInformationMap` is an argument which specifies a map of column
-// number to column header name which will be included in the outputted csv
+// index to column header name which will be included in the outputted csv
 // file.
 func ComputePropertiesForDataset(datasetName string,
 	propertiesToCompute, propertiesToOutputToCSV []RBSPropertyFunc,
 	fivePrimeUTRColIdx, cdsColIdx, tempColIdx, ribosomalRNAColIdx int,
 	otherInformationMap map[int]string) {
-	dataset := datasetsDirectory + "/" + datasetName + ".csv"
+	dataset := datasetName + ".csv"
 
-	// get the required information from `otherInformationMap`
+	// break down the `otherInformationMap` into the indexs of columns, and the
+	// header name of the columns that will be added to the output CSV
 	var otherInformationColIdxs []int
 	var otherInformationColHeaders []string
 	for colNum, colHeaderName := range otherInformationMap {
@@ -233,7 +223,7 @@ func ComputePropertiesForDataset(datasetName string,
 	// be outputted to a CSV file (based on `propertiesToOutputToCSV`) and push
 	// the string slice to `csvOutputChannel`
 	csvOutputChannel := make(chan []string)
-	// add to the wait group for the `computeProperties` subroutine
+	// add to the wait group for the `computeRBSProperties` subroutine
 	wg.Add(1)
 	go computeRBSProperties(rbsChannel, propertiesToCompute, propertiesToOutputToCSV, csvOutputChannel, &wg, otherInformationColHeaders...)
 
@@ -256,14 +246,14 @@ func populateRBSChannelFromDataset(csvFile string, rbsChannel chan *RibosomeBind
 	otherInformationColIdxs ...int) {
 	// close the rbs channel when this func returns
 	defer close(rbsChannel)
-	// call `wg.Done()` when this func returns
+	// call `wg.Done()` to decrement the wait group counter when this func returns
 	defer wg.Done()
 
 	// a channel that will hold rows of the CSV that are scanned
 	csvRowsChannel := make(chan []string)
 	// add to the wait group for the `csv_helper.ReadCSV` subroutine
 	wg.Add(1)
-	go csv_helper.ReadCSV(embeddedDatasetsDirectory, csvFile, csvRowsChannel, wg, 1)
+	go csv_helper.ReadCSV(datasets.EmbeddedDatasetsDirectory, csvFile, csvRowsChannel, wg, 1)
 
 	// weird Go syntax to wait for a message from a channel
 	for {
@@ -319,7 +309,7 @@ func computeRBSProperties(rbsChannel chan *RibosomeBindingSite,
 	wg *sync.WaitGroup, otherInformationColHeaders ...string) {
 	// close the csv output channel when this func returns
 	defer close(csvOutputChannel)
-	// call `wg.Done()` when this func returns
+	// call `wg.Done()` to decrement the wait group counter when this func returns
 	defer wg.Done()
 
 	// add the main `RibsomeBindingSite` struct fields to the header
@@ -328,8 +318,9 @@ func computeRBSProperties(rbsChannel chan *RibosomeBindingSite,
 	header = append(header, otherInformationColHeaders...)
 	// add the names of the property functions (that need to be included in the
 	// output csv) to the header
-	propertiesToOutputToCSVPropertyNames := FunctionNames(propertiesToOutputToCSV)
+	propertiesToOutputToCSVPropertyNames := FuncNames(propertiesToOutputToCSV)
 	header = append(header, propertiesToOutputToCSVPropertyNames...)
+
 	// write the header to the csv
 	csvOutputChannel <- header
 
@@ -344,12 +335,15 @@ func computeRBSProperties(rbsChannel chan *RibosomeBindingSite,
 				return
 			}
 
-			// compute properties for the rbs struct and get the list of computed
-			// property values that need to be added to the output csv
+			// compute properties for the rbs struct
 			rbs.ComputeProperties(properties)
+
+			// get the list of computed property values that need to be added to the
+			// output csv
 			propertyValues := rbs.PropertyValues(propertiesToOutputToCSVPropertyNames)
 
-			// add the required values of the rbs struct to the output
+			// finally, add the rbs fields, other information and property values to
+			// the output
 			// note: this should be in the same order as the header row above
 			var output []string = rbs.fieldValues()
 			output = append(output, rbs.OtherInformation...)
@@ -412,8 +406,8 @@ func (rbs RibosomeBindingSite) fieldValues() (fieldValues []string) {
 	return
 }
 
-// FunctionName returns a string of the name of the function `fn`
-func FunctionName(fn interface{}) string {
+// FuncName returns a string of the name of the function `fn`
+func FuncName(fn interface{}) string {
 	// get the full name of the function with package path
 	// `nameWithPackagePath` will be "<package>.<function name>"
 	fnNameWithPackagePath := runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
@@ -425,29 +419,30 @@ func FunctionName(fn interface{}) string {
 	return functionName
 }
 
-// FunctionNames returns the names of the function from a list of `Property`
-func FunctionNames(properties []RBSPropertyFunc) (names []string) {
+// FuncNames returns the names of the function from a list of `Property`
+func FuncNames(properties []RBSPropertyFunc) (names []string) {
 	for _, property := range properties {
-		names = append(names, FunctionName(property))
+		names = append(names, FuncName(property))
 	}
 	return
 }
 
 // ComputeProperties computes the properties specified by the `properties`
-// argument and returns a list of the computed property values if the property's
-// `IncludeInOutputCSV` field is set to true
+// argument and adds the computed property value to the `Properties` field map
+// of the `rbs` struct
 func (rbs *RibosomeBindingSite) ComputeProperties(properties []RBSPropertyFunc) {
 	for _, rbsPropertyFunc := range properties {
 		propertyValue := rbsPropertyFunc(rbs)
 
 		// add the computed property value to the `Properties` map
-		propertyName := FunctionName(rbsPropertyFunc)
+		propertyName := FuncName(rbsPropertyFunc)
 		rbs.Properties[propertyName] = propertyValue
 	}
 
 	return
 }
 
+// PropertyValues returns the values of the properties specified by `propertyNames`
 func (rbs *RibosomeBindingSite) PropertyValues(propertyNames []string) (ret []interface{}) {
 	for _, propertyName := range propertyNames {
 		ret = append(ret, rbs.Properties[propertyName])
@@ -455,8 +450,9 @@ func (rbs *RibosomeBindingSite) PropertyValues(propertyNames []string) (ret []in
 	return
 }
 
+// PropertyValue returns the value of the property `property`
 func (rbs *RibosomeBindingSite) PropertyValue(property RBSPropertyFunc) interface{} {
-	return rbs.Properties[FunctionName(property)]
+	return rbs.Properties[FuncName(property)]
 }
 
 // toString returns the string value of `i`
@@ -464,6 +460,8 @@ func toString(i interface{}) string {
 	return fmt.Sprint(i)
 }
 
+// stringSlice converts each variable of `interfaceSlice` to a string and
+// returns the resulting string slice
 func stringSlice(interfaceSlice []interface{}) (ret []string) {
 	ret = make([]string, len(interfaceSlice))
 	for i, v := range interfaceSlice {
@@ -473,11 +471,15 @@ func stringSlice(interfaceSlice []interface{}) (ret []string) {
 }
 
 /*********************************************************
-The following are generic functions that return the values of the fields
-of a `RibosomeBindingSite` struct.
+The following are default `RBSPropertyFunc` functions that return the values of
+the fields of a `RibosomeBindingSite` struct.
 
-These functions are used by the `rbs_calculator.PrintBindingSites` func
-to print out the values of the fields of a `RibosomeBindingSite` struct.
+These functions are used by the `rbs_calculator.TranslationInitiationRate` func
+to add default properties to a `RibosomeBindingSite` struct.
+
+`DefaultPropertiesToComputeBefore` is called before any properties are computed,
+and `DefaultPropertiesToComputeAfter` is called after all properties have been
+computed
 *********************************************************/
 
 // ensureSaneInput ensures sane input
@@ -492,27 +494,42 @@ func ensureSaneInput(rbs *RibosomeBindingSite) interface{} {
 // starts in the mRNA sequence. This property is not used in the free energy
 // model, but is added as we need to output the position at which the mRNA
 // sequence is delimited into its five prime UTR and coding sequence.
+//
+// We call this before any properties have been computed as the five prime
+// UTR could be updated by a property which would give us an incorrect start
+// position
 func StartPosition(rbs *RibosomeBindingSite) interface{} {
 	return len(rbs.FivePrimeUTR)
 }
 
+// DefaultPropertiesToComputeBefore specifies the properties to compute
+// before any of the `PropertiesToCompute` properties of the RBS calc model are
+// computed
 var DefaultPropertiesToComputeBefore []RBSPropertyFunc = []RBSPropertyFunc{
 	ensureSaneInput,
 	StartPosition,
 }
 
+// FivePrimeUTR returns the `FivePrimeUTR` field of the `rbs` struct
 func FivePrimeUTR(rbs *RibosomeBindingSite) interface{} {
 	return rbs.FivePrimeUTR
 }
 
+// ProteinCodingSequence returns the `ProteinCodingSequence` field of the `rbs`
+// struct
 func ProteinCodingSequence(rbs *RibosomeBindingSite) interface{} {
 	return rbs.ProteinCodingSequence
 }
 
+// TranslationInitiationRate returns the `TranslationInitiationRate` field of
+// the `rbs` struct
 func TranslationInitiationRate(rbs *RibosomeBindingSite) interface{} {
 	return rbs.TranslationInitiationRate
 }
 
+// DefaultPropertiesToComputeAfter specifies the properties to compute
+// after all of the `PropertiesToCompute` properties of the RBS calc model have
+// been computed
 var DefaultPropertiesToComputeAfter []RBSPropertyFunc = []RBSPropertyFunc{
 	FivePrimeUTR,
 	ProteinCodingSequence,

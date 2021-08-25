@@ -35,7 +35,7 @@ initiation rates of each binding site.
 
 The other intended use of this calculator is to help one increase synthesis of
 a desired protein by the user re-desinging their mRNA sequence to increase
-translation initiation rate which should lead to an increase in the amount of
+translation initiation rate which *should* lead to an increase in the amount of
 the protein produced in-vitro.
 
 How the calculator works:
@@ -100,7 +100,7 @@ var DefaultStartCodons []StartCodon = []StartCodon{AUG, GUG, CUG}
 //
 // The output can also be used to increase the amount of synthesis of your
 // desired protein. Redesign your mRNA sequence to have higher translation
-// initiation rates and this should correlate with an increase in the amount
+// initiation rates and this *should* lead to an increase in the amount
 // of protein synthesized by your mRNA strand in-vitro.
 //
 // Use the exported map `Organism16SrRNAMap` to find the 16s rRNA of the
@@ -110,8 +110,8 @@ func RibosomeBindingSites(ribosomalRNA, mRNA string, temperatureInCelsius float6
 	mRNA = model.CleanRNA(mRNA)
 
 	// for each start codon, find all occurrences of it in the mRNA sequence,
-	// create a `model.RibosomeBindingSite` and compute the translation
-	// initiation rate for each occurrence
+	// create a `model.RibosomeBindingSite` struct for it and compute the
+	// translation initiation rate for each struct
 	for _, startCondon := range startCodons {
 		startCodonRegex := regexp.MustCompile(string(startCondon))
 		matches := startCodonRegex.FindAllStringIndex(mRNA, -1)
@@ -124,7 +124,7 @@ func RibosomeBindingSites(ribosomalRNA, mRNA string, temperatureInCelsius float6
 		}
 	}
 
-	// sort by length of 5' UTR in ascending order
+	// sort by length of 5' UTR (start position) in ascending order
 	sort.Slice(ribosomeBindingSites, func(i, j int) bool {
 		return ribosomeBindingSites[i].PropertyValue(model.StartPosition).(int) < ribosomeBindingSites[j].PropertyValue(model.StartPosition).(int)
 	})
@@ -144,8 +144,9 @@ func SortByTranslationInitiationRate(ribosomeBindingSites []model.RibosomeBindin
 }
 
 // TranslationInitiationRate returns the the translation initiation rate of a
-// ribsome binding site as well as the binding site with the properties
-// computed to calculate the translation initiation rate
+// ribsome binding site as well as the binding site (as a
+// `model.RibosomeBindingSite` struct) with the properties computed to calculate
+// the translation initiation rate
 func TranslationInitiationRate(fivePrimeUTR, proteinCodingSequence, ribosomalRNA string, temperateureInCelsius float64) (translationInitiationRate float64, bindingSiteWithProperties model.RibosomeBindingSite) {
 	rbs := model.RibosomeBindingSite{
 		FivePrimeUTR:          fivePrimeUTR,
@@ -177,11 +178,8 @@ func TranslationInitiationRate(fivePrimeUTR, proteinCodingSequence, ribosomalRNA
 }
 
 // PrintBindingSites prints the important properties of a binding site.
-// The optional argument `propertiesToPrint` specifies the computed properties
-// of the binding site that will be printed. Note that the properties are
-// case-sensitive and must match one of the properties available in the
-// `model.RibosomeBindingSite.Properties` map after the properties of a binding
-// site have been computed.
+// The optional argument `additionalPropertiesToPrint` specifies the computed
+// properties of the binding site that will be printed.
 func PrintBindingSites(bindingSites []model.RibosomeBindingSite, includeSequences, includeStructures bool, additionalPropertiesToPrint ...PropertyToPrint) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetRowLine(true)
@@ -206,7 +204,7 @@ func PrintBindingSites(bindingSites []model.RibosomeBindingSite, includeSequence
 	}
 
 	if includeStructures {
-		propertiesToPrint = append(propertiesToPrint, salisLabV2_1StructureProperties...)
+		propertiesToPrint = append(propertiesToPrint, salisLabRBSModelStructureProperties...)
 	}
 
 	table.SetHeader(propertiesToPrintHeader(propertiesToPrint))
@@ -221,6 +219,8 @@ func PrintBindingSites(bindingSites []model.RibosomeBindingSite, includeSequence
 	table.Render()
 }
 
+// propertiesToPrintHeader returns a list of the `columnHeader` fields of each
+// `PropertyToPrint` struct
 func propertiesToPrintHeader(properties []PropertyToPrint) (ret []string) {
 	for _, propertyToPrint := range properties {
 		ret = append(ret, propertyToPrint.columnHeader)
@@ -228,7 +228,8 @@ func propertiesToPrintHeader(properties []PropertyToPrint) (ret []string) {
 	return
 }
 
-// returns the information of a binding site
+// rbsPropertyValues returns a list of the values of the `property` fields
+// of each `PropertyToPrint` struct
 func rbsPropertyValues(rbs model.RibosomeBindingSite, properties []PropertyToPrint) (ret []string) {
 	for _, propertyToPrint := range properties {
 		ret = append(ret, toString(rbs.PropertyValue(propertyToPrint.property)))
@@ -241,6 +242,8 @@ func toString(i interface{}) string {
 	return fmt.Sprint(i)
 }
 
+// PropertyToPrint specifies the computed property of a ribosome binding site
+// that will be printed when using the `PrintBindingSites` func
 type PropertyToPrint struct {
 	property     model.RBSPropertyFunc
 	columnHeader string
@@ -248,7 +251,15 @@ type PropertyToPrint struct {
 
 var inf float64 = 1000000000.0
 
-var salisLabV2_1StructureProperties []PropertyToPrint = []PropertyToPrint{
+// salisLabRBSModelStructureProperties are all the computed properties in the
+// Salis Lab v2.1 RBS Calc model that contain the dot-bracket structures
+// of the initial and final structure states.
+//
+// This variable should ideally be in the `salis_lab_v2_1` subpackage. However,
+// as the `PropertyToPrint` struct is defined in this package, adding this
+// variable to the `salis_lab_v2_1` package would lead to a cyclical import
+// which is not allowed in Go.
+var salisLabRBSModelStructureProperties []PropertyToPrint = []PropertyToPrint{
 	{property: rbs_model.UsedMRNADotBracketStructure, columnHeader: "Initial state"},
 	{property: rbs_model.MRNAPreRibosomeDotBracketStructure, columnHeader: "Final state (pre ribosome)"},
 	{property: rbs_model.SDBindingSiteMRNAStructure, columnHeader: "Final state (mRNA shine dalgarno binding site)"},
