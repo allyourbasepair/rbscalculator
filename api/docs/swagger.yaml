@@ -1,0 +1,54 @@
+basePath: /api/
+definitions:
+  main.CalculatorInput:
+    properties:
+      codingSequence:
+        type: string
+      fivePrimeUtr:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: The Poly RBS calculator
+  title: RBS calculator API
+  version: "0.1"
+paths:
+  /ping:
+    get:
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      summary: A pingable endpoint
+      tags:
+      - dev
+  /rbscalculator:
+    post:
+      consumes:
+      - application/json
+      description: An RBS calculator, only compatible with E.coli at 37c for now.
+      parameters:
+      - description: inputs to the RBS calculator
+        in: body
+        name: calculatorInput
+        required: true
+        schema:
+          $ref: '#/definitions/main.CalculatorInput'
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+      summary: calculate a ribosomal binding site
+      tags:
+      - main
+swagger: "2.0"

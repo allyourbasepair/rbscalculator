@@ -1,0 +1,84 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "The Poly RBS calculator",
+        "title": "RBS calculator API",
+        "contact": {},
+        "version": "0.1"
+    },
+    "basePath": "/api/",
+    "paths": {
+        "/ping": {
+            "get": {
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "dev"
+                ],
+                "summary": "A pingable endpoint",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/rbscalculator": {
+            "post": {
+                "description": "An RBS calculator, only compatible with E.coli at 37c for now.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "main"
+                ],
+                "summary": "calculate a ribosomal binding site",
+                "parameters": [
+                    {
+                        "description": "inputs to the RBS calculator",
+                        "name": "calculatorInput",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CalculatorInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "main.CalculatorInput": {
+            "type": "object",
+            "properties": {
+                "codingSequence": {
+                    "type": "string"
+                },
+                "fivePrimeUtr": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}
