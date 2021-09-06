@@ -17,6 +17,13 @@ rRNA of an organism to a dataset.
 //go:embed *
 var EmbeddedDatasetsDirectory embed.FS
 
+// DatasetColumn represents a column in a dataset. This is used to keep dataset
+// columns in the output CSV when generating a CSV with computed properties.
+type DatasetColumn struct {
+	Header string
+	Idx    int
+}
+
 // add16SrRNA adds the 16s rRNA (based on the
 // `rbs_calculator.Organism16SrRNAMap` map) to a dataset
 func add16SrRNA(datasetName string, organismColIdx int) {

@@ -1,4 +1,4 @@
-// +build gen_csv
+// build gen_csv
 
 // Since we don't want the tests below to run when `go test ./...` is used, the
 // above build contrain flag ensures the tests below are only run when we pass
@@ -7,23 +7,26 @@
 package salis_lab_v2_1
 
 import (
+	"testing"
+
 	"github.com/allyourbasepair/rbscalculator/model"
+	"github.com/allyourbasepair/rbscalculator/model/datasets"
 )
 
 // `cd` into this directory and run with
-// `go test -timeout 0 -run ^ExampleComputeProperties_forTrainDataset`
-func ExampleComputeProperties_forTrainDataset() {
+// `go test -timeout 0 -run ^TestComputeProperties_forTrainDataset -tags gen_csv`
+func TestComputeProperties_forTrainDataset(t *testing.T) {
 	datasetName := "train"
 
 	idColIdx, datasetColIdx, organismColIdx, tempColIdx, proteinColIdx, fivePrimeUTRColIdx, cdsColNum, proteinMeanColIdx, proteinStdColIdx, ribosomalRNAColIdx := 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 
-	var otherInformationColIdxNameMap map[int]string = map[int]string{
-		idColIdx:          "ID",
-		datasetColIdx:     "Dataset",
-		organismColIdx:    "Organism",
-		proteinColIdx:     "Protein",
-		proteinMeanColIdx: "Protein Mean",
-		proteinStdColIdx:  "Protein Std",
+	columnsToKeepInOutputCSV := []datasets.DatasetColumn{
+		{Idx: idColIdx, Header: "ID"},
+		{Idx: datasetColIdx, Header: "Dataset"},
+		{Idx: organismColIdx, Header: "Organism"},
+		{Idx: proteinColIdx, Header: "Protein"},
+		{Idx: proteinMeanColIdx, Header: "Protein Mean"},
+		{Idx: proteinStdColIdx, Header: "Protein Std"},
 	}
 
 	propertiesToOutputToCSV := []model.RBSPropertyFunc{
@@ -85,5 +88,5 @@ func ExampleComputeProperties_forTrainDataset() {
 		TotalFreeEnergy,
 	}
 
-	model.ComputePropertiesForDataset(datasetName, PropertiesToCompute, propertiesToOutputToCSV, fivePrimeUTRColIdx, cdsColNum, tempColIdx, ribosomalRNAColIdx, otherInformationColIdxNameMap)
+	model.ComputePropertiesForDataset(datasetName, PropertiesToCompute, propertiesToOutputToCSV, fivePrimeUTRColIdx, cdsColNum, tempColIdx, ribosomalRNAColIdx, columnsToKeepInOutputCSV...)
 }
