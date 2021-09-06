@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -41,7 +42,7 @@ func main() {
 	app := initializeApp()
 	// Serve application
 	s := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + os.Getenv("PORT"),
 		Handler: app.Router,
 	}
 	log.Fatal(s.ListenAndServe())
