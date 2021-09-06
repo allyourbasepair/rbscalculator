@@ -149,10 +149,10 @@ func SortByTranslationInitiationRate(ribosomeBindingSites []model.RibosomeBindin
 // the translation initiation rate
 func TranslationInitiationRate(fivePrimeUTR, proteinCodingSequence, ribosomalRNA string, temperateureInCelsius float64) (translationInitiationRate float64, bindingSiteWithProperties model.RibosomeBindingSite) {
 	rbs := model.RibosomeBindingSite{
-		FivePrimeUTR:          fivePrimeUTR,
-		ProteinCodingSequence: proteinCodingSequence,
+		FivePrimeUTR:          model.CleanRNA(fivePrimeUTR),
+		ProteinCodingSequence: model.CleanRNA(proteinCodingSequence),
 		Temperature:           temperateureInCelsius,
-		RibosomalRNA:          ribosomalRNA,
+		RibosomalRNA:          model.CleanRNA(ribosomalRNA),
 		Properties:            make(map[string]interface{}),
 		// we use inf as a sanity check to ensure `TranslationInitiationRate` has
 		// been computed for the binding site
