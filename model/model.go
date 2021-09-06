@@ -195,17 +195,8 @@ func CleanRNA(rna string) string {
 func ComputePropertiesForDataset(datasetName string,
 	propertiesToCompute, propertiesToOutputToCSV []RBSPropertyFunc,
 	fivePrimeUTRColIdx, cdsColIdx, tempColIdx, ribosomalRNAColIdx int,
-	otherInformationMap map[int]string) {
+	columnsToKeepInOutputCSV ...datasets.DatasetColumn) {
 	dataset := datasetName + ".csv"
-
-	// break down the `otherInformationMap` into the indexs of columns, and the
-	// header name of the columns that will be added to the output CSV
-	var otherInformationColIdxs []int
-	var otherInformationColHeaders []string
-	for colNum, colHeaderName := range otherInformationMap {
-		otherInformationColIdxs = append(otherInformationColIdxs, colNum)
-		otherInformationColHeaders = append(otherInformationColHeaders, colHeaderName)
-	}
 
 	// Create a wait group that will only 'release' when all go subroutines
 	// call `wg.Done()`
@@ -216,7 +207,7 @@ func ComputePropertiesForDataset(datasetName string,
 	rbsChannel := make(chan *RibosomeBindingSite)
 	// add to the wait group for the `populateMRNAChannelFromDataset` subroutine
 	wg.Add(1)
-	go populateRBSChannelFromDataset(dataset, rbsChannel, &wg, fivePrimeUTRColIdx, cdsColIdx, tempColIdx, ribosomalRNAColIdx, otherInformationColIdxs...)
+	go populateRBSChannelFromDataset(dataset, rbsChannel, &wg, fivePrimeUTRColIdx, cdsColIdx, tempColIdx, ribosomalRNAColIdx, columnsToKeepInOutputCSV...)
 
 	// Step 2: For each struct in `rbsChannel`, compute properties for it (based
 	// on `propertiesToCompute`), create a `[]string` with properties that should
@@ -225,7 +216,7 @@ func ComputePropertiesForDataset(datasetName string,
 	csvOutputChannel := make(chan []string)
 	// add to the wait group for the `computeRBSProperties` subroutine
 	wg.Add(1)
-	go computeRBSProperties(rbsChannel, propertiesToCompute, propertiesToOutputToCSV, csvOutputChannel, &wg, otherInformationColHeaders...)
+	go computeRBSProperties(rbsChannel, propertiesToCompute, propertiesToOutputToCSV, csvOutputChannel, &wg, columnsToKeepInOutputCSV...)
 
 	// Step 3: Output data from `csvOutputChannel` to a CSV file
 	datasetOutputFile := "./dataset_with_properties/" + datasetName + ".csv"
@@ -243,7 +234,7 @@ func ComputePropertiesForDataset(datasetName string,
 // row in the `csvFile` and adds it to `rbsChannel`
 func populateRBSChannelFromDataset(csvFile string, rbsChannel chan *RibosomeBindingSite,
 	wg *sync.WaitGroup, fivePrimeUTRColIdx, cdsColIdx, tempColIdx, RibosomalRNAColIdx int,
-	otherInformationColIdxs ...int) {
+	columnsToKeepInOutputCSV ...datasets.DatasetColumn) {
 	// close the rbs channel when this func returns
 	defer close(rbsChannel)
 	// call `wg.Done()` to decrement the wait group counter when this func returns
@@ -278,9 +269,9 @@ func populateRBSChannelFromDataset(csvFile string, rbsChannel chan *RibosomeBind
 
 			// get the other information which don't contribute to the
 			// `RibosomeBindingSite` struct, but we want to keep in the output csv
-			var otherInformation []string
-			for _, otherInformationColNum := range otherInformationColIdxs {
-				otherInformation = append(otherInformation, csvRow[otherInformationColNum])
+			var otherInformationToKeep []string
+			for _, datasetColumn := range columnsToKeepInOutputCSV {
+				otherInformationToKeep = append(otherInformationToKeep, csvRow[datasetColumn.Idx])
 			}
 
 			// finally, create a `RibosomeBindingSite` struct with the required info
@@ -290,7 +281,7 @@ func populateRBSChannelFromDataset(csvFile string, rbsChannel chan *RibosomeBind
 				Temperature:           temp,
 				RibosomalRNA:          CleanRNA(csvRow[RibosomalRNAColIdx]),
 				Properties:            make(map[string]interface{}),
-				OtherInformation:      otherInformation,
+				OtherInformation:      otherInformationToKeep,
 			}
 
 			// add the struct to the channel for use in the `computeRBSProperties` subroutine
@@ -306,16 +297,19 @@ func populateRBSChannelFromDataset(csvFile string, rbsChannel chan *RibosomeBind
 func computeRBSProperties(rbsChannel chan *RibosomeBindingSite,
 	properties, propertiesToOutputToCSV []RBSPropertyFunc,
 	csvOutputChannel chan []string,
-	wg *sync.WaitGroup, otherInformationColHeaders ...string) {
+	wg *sync.WaitGroup, columnsToKeepInOutputCSV ...datasets.DatasetColumn) {
 	// close the csv output channel when this func returns
 	defer close(csvOutputChannel)
 	// call `wg.Done()` to decrement the wait group counter when this func returns
 	defer wg.Done()
 
+	var header []string
+	// add the other information column headers to keep in the output csv file
+	for _, datasetColumn := range columnsToKeepInOutputCSV {
+		header = append(header, datasetColumn.Header)
+	}
 	// add the main `RibsomeBindingSite` struct fields to the header
-	header := ribosomeBindingSiteStructFields()
-	// add the other information column headers to the output csv file header
-	header = append(header, otherInformationColHeaders...)
+	header = append(header, ribosomeBindingSiteStructFields()...)
 	// add the names of the property functions (that need to be included in the
 	// output csv) to the header
 	propertiesToOutputToCSVPropertyNames := FuncNames(propertiesToOutputToCSV)
@@ -345,8 +339,8 @@ func computeRBSProperties(rbsChannel chan *RibosomeBindingSite,
 			// finally, add the rbs fields, other information and property values to
 			// the output
 			// note: this should be in the same order as the header row above
-			var output []string = rbs.fieldValues()
-			output = append(output, rbs.OtherInformation...)
+			var output []string = rbs.OtherInformation
+			output = append(output, rbs.fieldValues()...)
 			output = append(output, stringSlice(propertyValues)...)
 
 			csvOutputChannel <- output
@@ -535,3 +529,7 @@ var DefaultPropertiesToComputeAfter []RBSPropertyFunc = []RBSPropertyFunc{
 	ProteinCodingSequence,
 	TranslationInitiationRate,
 }
+
+/******************************************************************************
+End of default properties
+******************************************************************************/

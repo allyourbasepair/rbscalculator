@@ -70,6 +70,7 @@ var PropertiesToCompute []RBSPropertyFunc = []RBSPropertyFunc{
 	// Calculate dG_pre_ribosome
 	MRNAPreRibosomeSequence,
 	MRNAPreRibosomeDotBracketStructure,
+	PreRibosomeSecondaryStructure,
 	PreRibosomeFreeEnergy,
 
 	// Calculate dG_SD_aSD
@@ -84,7 +85,6 @@ var PropertiesToCompute []RBSPropertyFunc = []RBSPropertyFunc{
 	MRNARRNAHybridizationFreeEnergy,
 
 	// Step 7: Calculate dG_standby
-	MRNAPreRibosomeSecondaryStructure,
 	HairpinModule,
 	HasHairpinModule,
 	StandbyModuleTotalFreeEnergy,
@@ -507,19 +507,31 @@ func MRNAPreRibosomeDotBracketStructure(rbs *RibosomeBindingSite) interface{} {
 	}
 }
 
-// PreRibosomeFreeEnergy (dG_pre_ribosome) is the free energy of the mRNA-mRNA
-// interactions in the sequence before the shine-dalgarno binding site
-func PreRibosomeFreeEnergy(rbs *RibosomeBindingSite) interface{} {
+// PreRibosomeSecondaryStructure is the `SecondaryStructure` (with energy) of
+// the pre-ribosome mRNA sequence
+func PreRibosomeSecondaryStructure(rbs *RibosomeBindingSite) interface{} {
 	mrnaPreRibosomeDotBracketStructure := rbs.PropertyValue(MRNAPreRibosomeDotBracketStructure).(string)
 	if mrnaPreRibosomeDotBracketStructure == "" {
-		return 0.0
+		return nil
 	} else {
 		mrnaPreRibosomeSequence := rbs.PropertyValue(MRNAPreRibosomeSequence).(string)
-		dG_pre_ribosome, _, err := mfe.MinimumFreeEnergy(mrnaPreRibosomeSequence, mrnaPreRibosomeDotBracketStructure, rbs.Temperature, energy_params.Andronescu2007, mfe.NoDanglingEnds)
+		_, secondaryStructure, err := mfe.MinimumFreeEnergy(mrnaPreRibosomeSequence, mrnaPreRibosomeDotBracketStructure, rbs.Temperature, energy_params.Andronescu2007, mfe.NoDanglingEnds)
 		if err != nil {
 			panic(err)
 		}
-		return dG_pre_ribosome
+		return secondaryStructure
+	}
+}
+
+// PreRibosomeFreeEnergy (dG_pre_ribosome) is the free energy of the mRNA-mRNA
+// interactions in the sequence before the shine-dalgarno binding site
+func PreRibosomeFreeEnergy(rbs *RibosomeBindingSite) interface{} {
+	preRibosomeSecondaryStructure := rbs.PropertyValue(PreRibosomeSecondaryStructure).(*SecondaryStructure)
+
+	if preRibosomeSecondaryStructure == nil {
+		return 0.0
+	} else {
+		return float64(preRibosomeSecondaryStructure.Energy) / 100.0
 	}
 }
 
@@ -622,29 +634,18 @@ func MRNARRNAHybridizationFreeEnergy(rbs *RibosomeBindingSite) interface{} {
 Step 7: Calculate dG_standby
 *****************************************************/
 
-// MRNAPreRibosomeSecondaryStructure is the `SecondaryStructure` of the
-// pre-ribosome mRNA sequence
-func MRNAPreRibosomeSecondaryStructure(rbs *RibosomeBindingSite) interface{} {
-	mrnaPreRibosomeDotBracketStructure := rbs.PropertyValue(MRNAPreRibosomeDotBracketStructure).(string)
-	_, secondaryStructure, err := SecondaryStructureFromDotBracket(mrnaPreRibosomeDotBracketStructure)
-	if err != nil {
-		panic(err)
-	}
-	return secondaryStructure
-}
-
 // ribosomes likely bind to upstream standby sites. However, upstream standby
 // sites may have structures that cause them to be less favorable and hence
 // have a positive free energy associated with the site. HairpinModule returns
 // the most favorable upstream standby site.
 func HairpinModule(rbs *RibosomeBindingSite) interface{} {
-	mrnaPreRibosomeSecondaryStructure := rbs.PropertyValue(MRNAPreRibosomeSecondaryStructure).(*SecondaryStructure)
-	if mrnaPreRibosomeSecondaryStructure == nil {
+	preRibosomeSecondaryStructure := rbs.PropertyValue(PreRibosomeSecondaryStructure).(*SecondaryStructure)
+	if preRibosomeSecondaryStructure == nil {
 		return nil
 	}
 
 	// get all the upstream hairpin modules
-	hairpinModules := hm.HairpinModules(mrnaPreRibosomeSecondaryStructure.Structures)
+	hairpinModules := hm.HairpinModules(preRibosomeSecondaryStructure.Structures)
 
 	// for each hairpin module, add the sliding free energy penalty (the amount of
 	// energy required to unfold the downstream hairpin modules
