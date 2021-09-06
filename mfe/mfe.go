@@ -426,13 +426,20 @@ func hairpin(hairpin Hairpin, fc *foldCompound) (energy int) {
 		nbUnpairedNucleotides = 0
 	}
 
-	closingFivePrimeIdx, closingThreePrimeIdx := hairpin.Stem.EnclosedFivePrimeIdx, hairpin.Stem.EnclosedThreePrimeIdx
-	basePairType := encodedBasePairType(fc, closingFivePrimeIdx, closingThreePrimeIdx)
+	enclosedFivePrimeIdx, enclosedThreePrimeIdx := hairpin.Stem.EnclosedFivePrimeIdx, hairpin.Stem.EnclosedThreePrimeIdx
+
+	if enclosedFivePrimeIdx == -1 {
+		// hairpin is enclosed only by one base pair
+		enclosedFivePrimeIdx = hairpin.Stem.ClosingFivePrimeIdx
+		enclosedThreePrimeIdx = hairpin.Stem.ClosingThreePrimeIdx
+	}
+
+	basePairType := encodedBasePairType(fc, enclosedFivePrimeIdx, enclosedThreePrimeIdx)
 
 	energy = EvaluateHairpinLoop(nbUnpairedNucleotides, basePairType,
-		fc.encodedSequence[closingFivePrimeIdx+1],
-		fc.encodedSequence[closingThreePrimeIdx-1],
-		fc.sequence[closingFivePrimeIdx-1:], fc.energyParams)
+		fc.encodedSequence[enclosedFivePrimeIdx+1],
+		fc.encodedSequence[enclosedThreePrimeIdx-1],
+		fc.sequence[enclosedFivePrimeIdx-1:], fc.energyParams)
 
 	return
 }
