@@ -1,7 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "The Poly RBS calculator",
+        "description": "The allyourbasepair RBS calculator. For statistics comparing this RBS calculator to the salis lab calculator, please check https://github.com/allyourbasepair/rbscalculator",
         "title": "RBS calculator API",
         "contact": {},
         "version": "0.1"

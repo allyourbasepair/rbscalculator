@@ -115,7 +115,7 @@ var SwaggerInfo = swaggerInfo{
 	BasePath:    "/api/",
 	Schemes:     []string{},
 	Title:       "RBS calculator API",
-	Description: "The Poly RBS calculator",
+	Description: "The allyourbasepair RBS calculator. For statistics comparing this RBS calculator to the salis lab calculator, please check https://github.com/allyourbasepair/rbscalculator",
 }
 
 type s struct{}

@@ -35,7 +35,7 @@ func initializeApp() App {
 
 // @title RBS calculator API
 // @version 0.1
-// @description The Poly RBS calculator
+// @description The allyourbasepair RBS calculator. For statistics comparing this RBS calculator to the salis lab calculator, please check https://github.com/allyourbasepair/rbscalculator
 // @BasePath /api/
 func main() {
 	app := initializeApp()
