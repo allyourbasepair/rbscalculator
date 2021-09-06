@@ -9,8 +9,8 @@ This file computes statistics for the models the RBS calculator.
 
 Full credit for the functions herein go to Alex Reis (@reisalex) and The Salis
 Lab. All functions in this file have been taken from the `SynBioMTS`
-GitHub repo (https://github.com/reisalex/SynBioMTS), except for the function
-`linear_complete` which has minor modifications.
+GitHub repo (https://github.com/reisalex/SynBioMTS). The function
+`linear_complete` has minor modifications from the original repo.
 
 Please read the documentation of the `linear_complete` function for details
 on how to compute statistics of your RBS model.
@@ -272,8 +272,8 @@ def linear_complete(x_values, prot_mean, prot_std, linear_fit, x_scale='linear',
     is fitted to `x_values` and `prot_mean` and the equation of the line is
     used to calculate the `y_predicted` (translation initiation rate) values.
 
-    You should then update your `TranslationInitiationRate` function to use
-    the outputted slope and intercept values to calculate translation
+    You should then update your `ComputeTranslationInitiationRate` function to
+    use the outputted slope and intercept values to calculate translation
     initiation rate from your computed free energy values.
 
     Optionally, when `linear_fit` is set to `True`, you can pass the slope
@@ -433,6 +433,118 @@ def linear_complete(x_values, prot_mean, prot_std, linear_fit, x_scale='linear',
 
     return results, yError
 
+def linear_complete2(x_values, prot_mean, prot_std, linear_fit, x_scale='linear', y_scale='ln', slope=None, intercept=None):
+    '''
+    linear_complete returns all the statistics needed to analyse a RBS model.
+
+    The usage of this function differs if your model is a free energy model or
+    not.
+
+    If your RBS model is a free-energy model (i.e. you compute a final total
+    free energy value and then use that value to figure out the translation
+    initiation rate), then you should set the `linear_fit` param is set to
+    `True`.
+
+    When the `linear_fit` param is set to `True`, this function expects that
+    the `x_values` are the total free energy values. In this case, a line
+    is fitted to `x_values` and `prot_mean` and the equation of the line is
+    used to calculate the `y_predicted` (translation initiation rate) values.
+
+    You should then update your `ComputeTranslationInitiationRate` function to
+    use the outputted slope and intercept values to calculate translation
+    initiation rate from your computed free energy values.
+
+    Optionally, when `linear_fit` is set to `True`, you can pass the slope
+    and/or the intercept values that will be used to calculate the translation
+    initiation rate values (`y_predicted`) from your total free energy values
+    (`x_values`).
+
+
+    If your RBS model is not a free-energy model then the `x_values` should be
+    the translation initiation rates. In this case, you should set `linear_fit`
+    param is set to `False`. In this case, no line is fitted and only the
+    statistics for your model are calculated.
+    '''
+    # Useful lambda functions
+    def calc_x(a0, a1, y): return (y-a0)/a1
+    def calc_y(a0, a1, x): return a1*x+a0
+
+    if y_scale == 'log10':
+        prot_mean = np.log10(prot_mean)
+    elif y_scale == 'ln':
+        prot_mean = np.log(prot_mean)
+    elif y_scale == 'linear':
+        pass
+    else:
+        raise ValueError(
+            "Invalid input in ModelTest._linear_model_stats for yScale: {}".format(y_scale))
+
+    if x_scale == 'log10':
+        x_values = np.log10(x_values)
+    elif x_scale == 'ln':
+        x_values = np.log(x_values)
+    elif x_scale == 'linear':
+        pass
+    else:
+        raise ValueError(
+            "Invalid input in ModelTest._linear_model_stats for xScale: {}".format(x_scale))
+
+    outliers = 0
+    if linear_fit:
+        a1, a0 = 0, 0
+        if slope != None and intercept != None:
+            a1 = slope
+            a0 = intercept
+        else:
+            # determine outliers with initial fit
+            (a1, a0) = fit_linear_model(x_values, prot_mean, slope=slope)
+            app_xVals = calc_x(a0, a1, prot_mean)
+            abs_delta_x = np.absolute(x_values - app_xVals)
+            outliers = find_outliers(abs_delta_x)
+            keepers = np.invert(outliers)
+
+            # reapply fit with trimmed dataset & calculate error
+            xVals1 = x_values[keepers]
+            yVals1 = prot_mean[keepers]
+            (a1, a0) = fit_linear_model(xVals1, yVals1, slope=slope)
+
+        y_predicted = calc_y(a0, a1, x_values)
+    else:
+        y_predicted = x_values
+
+    residuals = prot_mean - y_predicted
+
+    if y_scale == 'log10':
+        yError = 10**(residuals)
+    elif y_scale == 'ln':
+        yError = np.exp(residuals)
+    else:
+        yError = prot_mean/y_predicted
+
+    # Pearson/Spearman correlation coefficients
+    (R, Pearson_p) = correlation(y_predicted, prot_mean)
+    (rho, Spearman_p) = correlation(y_predicted, prot_mean)
+
+    # Root Mean Square Error (RMSE)
+    # n = len(yVals)
+    # SSE = np.sum(res**2.0 for res in residuals)
+    # RMSE = np.sqrt(SSE/n)
+    RMSE = np.sqrt(1-R**2.0)*np.std(prot_mean)
+
+
+    results = {
+        "Pearson R-squared": R**2.0,
+        "Pearson p": Pearson_p,
+        "Spearman R-squared": rho**2.0,
+        "Spearman p": Spearman_p,
+        "N-outliers": np.sum(outliers),
+        "slope": a1,
+        "intercept": a0,
+        "RMSE": RMSE,
+    }
+
+    return results, yError
+
 
 def compute_stats(csv_file, x_values_col_idx, prot_mean_col_idx, prot_std_col_idx, linear_fit, slope=None, intercept=None, use_filter=False, filter_col_idx=None, filter_values=None):
     '''
@@ -492,31 +604,58 @@ def compute_stats(csv_file, x_values_col_idx, prot_mean_col_idx, prot_std_col_id
 
     pd.options.display.max_columns = None
     df = pd.DataFrame(all_stats_dict)
-    print(tabulate(df,headers='keys',tablefmt='psql'))
+    # print(df.to_markdown())
+    print(tabulate(df,headers='keys',tablefmt='pipe'))
 
     # only return the all stats dict
     return stats_dict
 
 
-def do_compute_stats(total_free_energy, prot_mean, prot_std, idxs, filter_value, linear_fit, slope, intercept):
-    print('processing {}'.format(filter_value))
+def do_compute_stats(total_free_energy, prot_mean, prot_std, idxs, reference, linear_fit, slope, intercept):
+    print('processing {}'.format(reference))
+    total_free_energy, prot_mean, prot_std = filter_curr_dataset(total_free_energy, prot_mean, prot_std, idxs)
+
+    return do_do_compute_stats(total_free_energy, prot_mean, prot_std, reference, linear_fit, slope, intercept)
+
+def filter_curr_dataset(total_free_energy, prot_mean, prot_std, idxs):
     curr_dataset_total_free_energy = total_free_energy[idxs]
     curr_dataset_prot_mean = prot_mean[idxs]
     curr_dataset_prot_std = prot_std[idxs]
 
-    # filter out no-prediction sequences (nan and inf values)
-    invalid = np.isnan(curr_dataset_total_free_energy) + \
-        np.isinf(curr_dataset_total_free_energy) + \
-        (curr_dataset_total_free_energy == 0.0)
-    valid_total_free_energy = curr_dataset_total_free_energy[~invalid]
-    valid_prot_mean = curr_dataset_prot_mean[~invalid]
-    valid_prot_std = curr_dataset_prot_std[~invalid]
-    count_invalid = np.sum(invalid)
+    return curr_dataset_total_free_energy, curr_dataset_prot_mean, curr_dataset_prot_std
 
-    dataset_stats, _yError = linear_complete(valid_total_free_energy,
-                                             valid_prot_mean, valid_prot_std, linear_fit, slope=slope, intercept=intercept)
-    dataset_stats["filter"] = filter_value
-    dataset_stats["size"] = len(valid_total_free_energy)
+def filter_invalid(total_free_energy, prot_mean, prot_std):
+    invalid = np.isnan(total_free_energy) + \
+        np.isinf(total_free_energy) + \
+        (total_free_energy == 0.0)
+    valid_total_free_energy = total_free_energy[~invalid]
+    valid_prot_mean = prot_mean[~invalid]
+    valid_prot_std = prot_std[~invalid]
+    count_invalid = np.sum(invalid)
+    return valid_total_free_energy, valid_prot_mean, valid_prot_std, count_invalid
+
+def do_do_compute_stats(total_free_energy, prot_mean, prot_std, reference, linear_fit, slope=None, intercept=None):
+    # filter out no-prediction sequences (nan and inf values)
+    total_free_energy, prot_mean, prot_std, count_invalid = filter_invalid(total_free_energy, prot_mean, prot_std)
+
+    dataset_stats, _yError = linear_complete(total_free_energy, prot_mean,
+        prot_std, linear_fit, slope=slope, intercept=intercept)
+    dataset_stats["#reference"] = reference
+    dataset_stats["size"] = len(total_free_energy)
+    dataset_stats["invalid count"] = count_invalid
+    slope, intercept = dataset_stats["slope"], dataset_stats["intercept"]
+    dataset_stats["slope / intercept string"] = 'slope, intercept := {}, {}\n'.format(slope, intercept)
+
+    return dataset_stats
+
+def do_do_do_compute_stats(total_free_energy, prot_mean, prot_std, reference, linear_fit, slope=None, intercept=None):
+    # filter out no-prediction sequences (nan and inf values)
+    total_free_energy, prot_mean, prot_std, count_invalid = filter_invalid(total_free_energy, prot_mean, prot_std)
+
+    dataset_stats, _yError = linear_complete2(total_free_energy, prot_mean,
+        prot_std, linear_fit, slope=slope, intercept=intercept)
+    dataset_stats["#reference"] = reference
+    dataset_stats["size"] = len(total_free_energy)
     dataset_stats["invalid count"] = count_invalid
     slope, intercept = dataset_stats["slope"], dataset_stats["intercept"]
     dataset_stats["slope / intercept string"] = 'slope, intercept := {}, {}\n'.format(slope, intercept)
@@ -524,18 +663,26 @@ def do_compute_stats(total_free_energy, prot_mean, prot_std, idxs, filter_value,
     return dataset_stats
 
 
-
 if __name__ == "__main__":
-    dataset_with_properties = "./salis_lab_v2_1/dataset_with_properties/train_1629043294.csv"
+    # dataset_with_properties = "./salis_lab_v2_1/dataset_with_properties/train_old.csv"
+    dataset_with_properties = "./salis_lab_v2_1/dataset_with_properties/train_with_salis_sd_algo.csv"
 
-    dataset_idx = 7
+    # dataset_idx = 5
+
+    # old
+    # total_free_energy_idx, prot_mean_idx, prot_std_idx, dataset_idx = 41, 8, 9, 5
+
+    # new
+    total_free_energy_idx, prot_mean_idx, prot_std_idx, dataset_idx = 42, 4, 5, 1
+
     dataset_filter_values = ["Kosuri_PNAS_2013", "Goodman_Science_2013"]
     # organism_col_idx = 11
     # organism_filter_values = [
     #     "Escherichia coli BL21(DE3)", "Escherichia coli str. K-12 substr. DH10B", "Escherichia coli str. K-12 substr. MG1655"]
     # protein_col_idx = 5
     # protein_filter_values = ["sfGFP", "RFP", "RFP-GFP"]
-    total_free_energy_idx, prot_mean_idx, prot_std_idx = 44, 4, 5
+    # total_free_energy_idx, prot_mean_idx, prot_std_idx = 42, 8, 9
+
 
     stats_dict = compute_stats(dataset_with_properties, total_free_energy_idx,
         prot_mean_idx, prot_std_idx, linear_fit=True, use_filter=True,
@@ -543,7 +690,15 @@ if __name__ == "__main__":
     # slope, intercept = stats_dict["slope"], stats_dict["intercept"]
     slope = -0.45
     # intercept = 7.11720550316
+    print("With slope of -0.45\n\n")
     stats_dict = compute_stats(dataset_with_properties, total_free_energy_idx,
         prot_mean_idx, prot_std_idx, linear_fit=True, slope=slope,
-        use_filter=False, filter_col_idx=dataset_idx,
+        use_filter=True, filter_col_idx=dataset_idx,
         filter_values=dataset_filter_values)
+
+
+
+
+
+
+
