@@ -269,18 +269,17 @@ func shineDalgarnoBindingSite(rbs *RibosomeBindingSite) interface{} {
 			}
 
 			// compute upstream and downstream region energies
+			upstreamRegion := rbs.FivePrimeUTR[:sdBindingSite.MRNAFivePrimeIdx]
+			if len(upstreamRegion) != 0 {
+				_, utrFreeEnergy := linearfold.ViennaRNAFold(upstreamRegion, rbs.Temperature, energy_params.Andronescu2007, mfe.NoDanglingEnds, linearfold.DefaultBeamSize)
+				sdBindingSite.UTRFreeEnergy = utrFreeEnergy
+			}
 
-			// upstreamRegion := rbs.FivePrimeUTR[:sdBindingSite.MRNAFivePrimeIdx]
-			// if len(upstreamRegion) != 0 {
-			// 	_, utrFreeEnergy := linearfold.ViennaRNAFold(upstreamRegion, rbs.Temperature, energy_params.Andronescu2007, mfe.NoDanglingEnds, linearfold.DefaultBeamSize)
-			// 	sdBindingSite.UTRFreeEnergy = utrFreeEnergy
-			// }
-
-			// downstreamRegion := rbs.FivePrimeUTR[sdBindingSite.MRNAThreePrimeIdx+1:]
-			// if len(downstreamRegion) != 0 {
-			// 	_, dtrFreeEnergy := linearfold.ViennaRNAFold(downstreamRegion, rbs.Temperature, energy_params.Andronescu2007, mfe.NoDanglingEnds, linearfold.DefaultBeamSize)
-			// 	sdBindingSite.DTRFreeEnergy = dtrFreeEnergy
-			// }
+			downstreamRegion := rbs.FivePrimeUTR[sdBindingSite.MRNAThreePrimeIdx+1:]
+			if len(downstreamRegion) != 0 {
+				_, dtrFreeEnergy := linearfold.ViennaRNAFold(downstreamRegion, rbs.Temperature, energy_params.Andronescu2007, mfe.NoDanglingEnds, linearfold.DefaultBeamSize)
+				sdBindingSite.DTRFreeEnergy = dtrFreeEnergy
+			}
 
 			// compute the free energy of the spacing region of this binding site
 			sdBindingSite.AlignedSpacingFreeEnergy = compute_dG_spacing(sdBindingSite.AlignedSpacing)
